@@ -673,7 +673,7 @@ export default function ArtisticPortfolio() {
         <div className="flex items-center justify-end gap-2">
           <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-400 rounded-full pulse-glow" />
           <span className="text-[9px] sm:text-[10px] md:text-xs font-mono tracking-wider sm:tracking-widest uppercase text-white font-bold">
-            Seeking Summer 2025 Internship
+            Seeking Summer 2026 Internship
           </span>
         </div>
         <p className="hidden sm:flex text-[10px] md:text-xs font-mono text-gray-300 mt-1 font-medium items-center justify-end gap-1">
