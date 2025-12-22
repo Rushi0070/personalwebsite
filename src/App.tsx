@@ -75,72 +75,82 @@ const useDeviceDetect = () => {
   return { isMobile, isTablet, isLowPower };
 };
 
-// --- OPTIMIZED AUDIO ENGINE ---
+// --- 🎹 INTERSTELLAR BACKGROUND MUSIC ---
 const useSound = () => {
   const [isMuted, setIsMuted] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const bufferRef = useRef<AudioBuffer | null>(null);
+  const noiseBufferRef = useRef<AudioBuffer | null>(null);
   const isInitializedRef = useRef(false);
 
   const initAudio = useCallback(() => {
-    if (isInitializedRef.current) {
-      if (audioCtxRef.current?.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-      setIsMuted(false);
-      return;
+    // Initialize background music
+    if (!audioRef.current) {
+      const audio = new Audio('/02 Cornfield Chase.mp3');
+      audio.loop = true;
+      audio.volume = 0.3; // Soft background volume
+      audioRef.current = audio;
     }
-
-    try {
-      const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
-      audioCtxRef.current = new AudioContext();
-      
-      const bufferSize = audioCtxRef.current.sampleRate * 2;
-      const buffer = audioCtxRef.current.createBuffer(1, bufferSize, audioCtxRef.current.sampleRate);
-      const data = buffer.getChannelData(0);
-      
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
+    
+    // Play the music
+    audioRef.current.play().catch(e => {
+      console.warn('Audio playback failed:', e);
+    });
+    
+    // Initialize Web Audio for hover sounds
+    if (!isInitializedRef.current) {
+      try {
+        const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
+        const ctx = new AudioContext();
+        audioCtxRef.current = ctx;
+        
+        // Create noise buffer for hover sounds
+        const bufferSize = ctx.sampleRate * 2;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        noiseBufferRef.current = buffer;
+        isInitializedRef.current = true;
+      } catch (e) {
+        console.warn('Audio context failed:', e);
       }
-      bufferRef.current = buffer;
-      isInitializedRef.current = true;
-      
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-      setIsMuted(false);
-    } catch (e) {
-      console.warn('Audio initialization failed:', e);
     }
+    
+    setIsMuted(false);
   }, []);
 
+  // Hover tick sound
   const playHover = useCallback(() => {
-    if (isMuted || !audioCtxRef.current || !bufferRef.current) return;
+    if (isMuted || !audioCtxRef.current || !noiseBufferRef.current) return;
     if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
     }
     
     try {
-      const t = audioCtxRef.current.currentTime;
-      const source = audioCtxRef.current.createBufferSource();
-      source.buffer = bufferRef.current;
+      const ctx = audioCtxRef.current;
+      const t = ctx.currentTime;
       
-      const filter = audioCtxRef.current.createBiquadFilter();
+      const source = ctx.createBufferSource();
+      source.buffer = noiseBufferRef.current;
+      
+      const filter = ctx.createBiquadFilter();
       filter.type = 'highpass';
       filter.frequency.value = 2000;
 
-      const gain = audioCtxRef.current.createGain();
-      gain.gain.setValueAtTime(0.08, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.06, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
 
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(audioCtxRef.current.destination);
+      gain.connect(ctx.destination);
       
       source.start(t);
       source.stop(t + 0.02);
     } catch {
-      // Silently fail for audio errors
+      // Silently fail
     }
   }, [isMuted]);
 
@@ -149,11 +159,20 @@ const useSound = () => {
       initAudio();
     } else {
       setIsMuted(true);
+      
+      // Pause the music
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
     }
   }, [isMuted, initAudio]);
 
   useEffect(() => {
     return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       if (audioCtxRef.current) {
         audioCtxRef.current.close().catch(() => {});
       }
