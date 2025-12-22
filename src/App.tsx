@@ -23,6 +23,7 @@ interface ListItemProps {
   link?: string;
   playHover: () => void;
   date?: string;
+  companyUrl?: string;
 }
 
 interface StackCategory {
@@ -383,7 +384,7 @@ const FlowFieldBackground = memo(({ isMobile, isLowPower }: { isMobile: boolean;
 FlowFieldBackground.displayName = 'FlowFieldBackground';
 
 // --- LIST ITEM COMPONENT ---
-const ListItem = memo(({ index, title, subtitle, description, tags, link, playHover, date }: ListItemProps) => {
+const ListItem = memo(({ index, title, subtitle, description, tags, link, playHover, date, companyUrl }: ListItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleClick = () => {
@@ -407,9 +408,24 @@ const ListItem = memo(({ index, title, subtitle, description, tags, link, playHo
         <div className="flex items-baseline gap-3 sm:gap-4 md:gap-6 md:w-1/3">
           <span className="font-mono text-xs md:text-sm text-gray-500 font-medium">0{index}</span>
           <div>
-            <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-cyan-200 transition-colors duration-300">
-              {title}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-cyan-200 transition-colors duration-300">
+                {title}
+              </h3>
+              {companyUrl && (
+                <a
+                  href={companyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-gray-500 hover:text-cyan-400 transition-colors p-1 hover:bg-white/10 rounded"
+                  title="Visit company website"
+                  aria-label={`Visit ${title} website (opens in new tab)`}
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                </a>
+              )}
+            </div>
             {subtitle && (
               <p className="text-xs md:text-sm font-mono text-cyan-400 mt-1 md:mt-2 font-medium">
                 {subtitle}
@@ -487,6 +503,7 @@ const WorkSection = memo(({ playHover }: { playHover: () => void }) => (
         title="Aivid Tech Vision"
         subtitle="Computer Vision Intern"
         date="Feb 2025 – July 2025"
+        companyUrl="https://aivid.ai/about-us/"
         description={
           <ul className="list-disc pl-4 space-y-2 sm:space-y-3 text-gray-200">
             <li>Engineered and deployed deep learning models for people-counting, demographic classification, and product defect detection; achieved 95%+ accuracy.</li>
