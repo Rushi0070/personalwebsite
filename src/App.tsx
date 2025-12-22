@@ -531,9 +531,10 @@ const ProjectsSection = memo(({ playHover }: { playHover: () => void }) => (
         index="1"
         title="SEC Alpha Gen"
         subtitle="Alphathon 2025"
-        description="Quantitative NLP pipeline processing SEC 10-K/10-Q filings. Utilized FinBERT and RoBERTa to detect narrative shifts and generate tradable signals. Trained Random Forest with SHAP explainability, backtested against SPY optimizing for Sharpe ratio."
-        tags={['NLP', 'FinBERT', 'HuggingFace', 'Streamlit', 'Quantitative Finance']}
+        description="Quantitative NLP pipeline processing SEC 10-K/10-Q filings. Utilized FinBERT and RoBERTa to detect narrative shifts and generate tradable signals. Trained CatBoost with SHAP explainability achieving 76.92% accuracy and 1.90 Sharpe ratio."
+        tags={['NLP', 'FinBERT', 'CatBoost', 'SHAP', 'Quantitative Finance']}
         link="#"
+        companyUrl="https://github.com/Rushi0070/sec-investment-signals"
         playHover={playHover}
       />
       <ListItem 
