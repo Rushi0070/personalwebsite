@@ -74,67 +74,117 @@ const useDeviceDetect = () => {
   return { isMobile, isTablet, isLowPower };
 };
 
-// --- OPTIMIZED AUDIO ENGINE ---
+// --- OPTIMIZED AUDIO ENGINE (Mobile-compatible) ---
 const useSound = () => {
   const [isMuted, setIsMuted] = useState(true);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const bufferRef = useRef<AudioBuffer | null>(null);
   const isInitializedRef = useRef(false);
 
-  const initAudio = useCallback(() => {
-    if (isInitializedRef.current) {
-      if (audioCtxRef.current?.state === 'suspended') {
-        audioCtxRef.current.resume();
+  // Create noise buffer for hover sounds
+  const createNoiseBuffer = useCallback((ctx: AudioContext) => {
+    const bufferSize = ctx.sampleRate * 2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    return buffer;
+  }, []);
+
+  // Play a short confirmation sound (for mobile unlock feedback)
+  const playUnlockSound = useCallback((ctx: AudioContext) => {
+    try {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, ctx.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+      
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.15);
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
+  const initAudio = useCallback(async () => {
+    // If already initialized, just resume and unmute
+    if (isInitializedRef.current && audioCtxRef.current) {
+      try {
+        if (audioCtxRef.current.state === 'suspended') {
+          await audioCtxRef.current.resume();
+        }
+        playUnlockSound(audioCtxRef.current);
+        setIsMuted(false);
+      } catch (e) {
+        console.warn('Audio resume failed:', e);
       }
-      setIsMuted(false);
       return;
     }
 
     try {
-      const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
-      audioCtxRef.current = new AudioContext();
+      // Create AudioContext (with webkit prefix for older iOS)
+      const AudioContextClass = window.AudioContext || 
+        (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
       
-      const bufferSize = audioCtxRef.current.sampleRate * 2;
-      const buffer = audioCtxRef.current.createBuffer(1, bufferSize, audioCtxRef.current.sampleRate);
-      const data = buffer.getChannelData(0);
+      const ctx = new AudioContextClass();
+      audioCtxRef.current = ctx;
       
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
+      // Mobile browsers start AudioContext in suspended state
+      // Must resume within user gesture handler
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
       }
-      bufferRef.current = buffer;
+      
+      // Create the noise buffer for hover effects
+      bufferRef.current = createNoiseBuffer(ctx);
       isInitializedRef.current = true;
       
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
+      // Play confirmation sound so user knows audio is working
+      playUnlockSound(ctx);
+      
       setIsMuted(false);
     } catch (e) {
       console.warn('Audio initialization failed:', e);
     }
-  }, []);
+  }, [createNoiseBuffer, playUnlockSound]);
 
   const playHover = useCallback(() => {
     if (isMuted || !audioCtxRef.current || !bufferRef.current) return;
-    if (audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume();
+    
+    const ctx = audioCtxRef.current;
+    
+    // Ensure context is running (can get suspended on mobile after tab switch)
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+      return; // Skip this sound, next one will work
     }
     
     try {
-      const t = audioCtxRef.current.currentTime;
-      const source = audioCtxRef.current.createBufferSource();
+      const t = ctx.currentTime;
+      const source = ctx.createBufferSource();
       source.buffer = bufferRef.current;
       
-      const filter = audioCtxRef.current.createBiquadFilter();
+      const filter = ctx.createBiquadFilter();
       filter.type = 'highpass';
       filter.frequency.value = 2000;
 
-      const gain = audioCtxRef.current.createGain();
+      const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.08, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
 
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(audioCtxRef.current.destination);
+      gain.connect(ctx.destination);
       
       source.start(t);
       source.stop(t + 0.02);
@@ -145,6 +195,8 @@ const useSound = () => {
 
   const toggleMute = useCallback(() => {
     if (isMuted) {
+      // initAudio is async but we don't need to await here
+      // The state update will happen after audio is ready
       initAudio();
     } else {
       setIsMuted(true);
