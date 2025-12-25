@@ -7,7 +7,6 @@ import {
   Volume2,
   VolumeX,
   Download,
-  Phone,
   MapPin,
   Calendar,
   Twitter
@@ -75,82 +74,72 @@ const useDeviceDetect = () => {
   return { isMobile, isTablet, isLowPower };
 };
 
-// --- 🎹 INTERSTELLAR BACKGROUND MUSIC ---
+// --- OPTIMIZED AUDIO ENGINE ---
 const useSound = () => {
   const [isMuted, setIsMuted] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const noiseBufferRef = useRef<AudioBuffer | null>(null);
+  const bufferRef = useRef<AudioBuffer | null>(null);
   const isInitializedRef = useRef(false);
 
   const initAudio = useCallback(() => {
-    // Initialize background music
-    if (!audioRef.current) {
-      const audio = new Audio('/02 Cornfield Chase.mp3');
-      audio.loop = true;
-      audio.volume = 0.3; // Soft background volume
-      audioRef.current = audio;
-    }
-    
-    // Play the music
-    audioRef.current.play().catch(e => {
-      console.warn('Audio playback failed:', e);
-    });
-    
-    // Initialize Web Audio for hover sounds
-    if (!isInitializedRef.current) {
-      try {
-        const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
-        const ctx = new AudioContext();
-        audioCtxRef.current = ctx;
-        
-        // Create noise buffer for hover sounds
-        const bufferSize = ctx.sampleRate * 2;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-        noiseBufferRef.current = buffer;
-        isInitializedRef.current = true;
-      } catch (e) {
-        console.warn('Audio context failed:', e);
+    if (isInitializedRef.current) {
+      if (audioCtxRef.current?.state === 'suspended') {
+        audioCtxRef.current.resume();
       }
+      setIsMuted(false);
+      return;
     }
-    
-    setIsMuted(false);
+
+    try {
+      const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
+      audioCtxRef.current = new AudioContext();
+      
+      const bufferSize = audioCtxRef.current.sampleRate * 2;
+      const buffer = audioCtxRef.current.createBuffer(1, bufferSize, audioCtxRef.current.sampleRate);
+      const data = buffer.getChannelData(0);
+      
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      bufferRef.current = buffer;
+      isInitializedRef.current = true;
+      
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+      setIsMuted(false);
+    } catch (e) {
+      console.warn('Audio initialization failed:', e);
+    }
   }, []);
 
-  // Hover tick sound
   const playHover = useCallback(() => {
-    if (isMuted || !audioCtxRef.current || !noiseBufferRef.current) return;
+    if (isMuted || !audioCtxRef.current || !bufferRef.current) return;
     if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
     }
     
     try {
-      const ctx = audioCtxRef.current;
-      const t = ctx.currentTime;
+      const t = audioCtxRef.current.currentTime;
+      const source = audioCtxRef.current.createBufferSource();
+      source.buffer = bufferRef.current;
       
-      const source = ctx.createBufferSource();
-      source.buffer = noiseBufferRef.current;
-      
-      const filter = ctx.createBiquadFilter();
+      const filter = audioCtxRef.current.createBiquadFilter();
       filter.type = 'highpass';
       filter.frequency.value = 2000;
 
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.06, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
+      const gain = audioCtxRef.current.createGain();
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
 
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(audioCtxRef.current.destination);
       
       source.start(t);
       source.stop(t + 0.02);
     } catch {
-      // Silently fail
+      // Silently fail for audio errors
     }
   }, [isMuted]);
 
@@ -159,20 +148,11 @@ const useSound = () => {
       initAudio();
     } else {
       setIsMuted(true);
-      
-      // Pause the music
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
     }
   }, [isMuted, initAudio]);
 
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
       if (audioCtxRef.current) {
         audioCtxRef.current.close().catch(() => {});
       }
@@ -678,22 +658,27 @@ export default function ArtisticPortfolio() {
       )}
 
       {/* Header - Left */}
-      <header className="fixed top-4 left-4 sm:top-6 sm:left-6 md:top-8 md:left-8 z-50 mix-blend-difference safe-left safe-top">
-        <h1 className="text-sm md:text-base font-bold tracking-widest uppercase text-white">
+      <header className="fixed top-4 left-4 sm:top-6 sm:left-6 md:top-8 md:left-8 z-50 mix-blend-difference safe-left safe-top mobile-header-left">
+        <h1 className="text-sm md:text-base font-bold tracking-widest uppercase text-white truncate">
           Rushi Jhala
         </h1>
         <p className="text-[10px] md:text-xs font-mono text-gray-300 mt-1 font-medium leading-relaxed">
-          Stony Brook University<br className="sm:hidden" />
-          <span className="hidden sm:inline"> // </span>MS Data Science
+          <span className="hidden xs:inline">Stony Brook University</span>
+          <span className="xs:hidden">SBU</span>
+          <br className="sm:hidden" />
+          <span className="hidden sm:inline"> // </span>
+          <span className="hidden xs:inline">MS Data Science</span>
+          <span className="xs:hidden">MSDS</span>
         </p>
       </header>
 
       {/* Header - Right */}
-      <div className="fixed top-4 right-4 sm:top-6 sm:right-6 md:top-8 md:right-8 z-50 mix-blend-difference text-right safe-right safe-top">
-        <div className="flex items-center justify-end gap-2">
-          <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-400 rounded-full pulse-glow" />
-          <span className="text-[9px] sm:text-[10px] md:text-xs font-mono tracking-wider sm:tracking-widest uppercase text-white font-bold">
-            Seeking Summer 2026 Internship
+      <div className="fixed top-4 right-4 sm:top-6 sm:right-6 md:top-8 md:right-8 z-50 mix-blend-difference text-right safe-right safe-top mobile-header-right">
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2">
+          <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-400 rounded-full pulse-glow flex-shrink-0" />
+          <span className="text-[8px] xs:text-[9px] sm:text-[10px] md:text-xs font-mono tracking-wider sm:tracking-widest uppercase text-white font-bold leading-tight">
+            <span className="hidden xs:inline">Seeking Summer 2026 Internship</span>
+            <span className="xs:hidden">Open to Work</span>
           </span>
         </div>
         <p className="hidden sm:flex text-[10px] md:text-xs font-mono text-gray-300 mt-1 font-medium items-center justify-end gap-1">
@@ -704,7 +689,7 @@ export default function ArtisticPortfolio() {
 
       {/* Navigation */}
       <nav 
-        className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 md:bottom-8 md:left-8 z-50 flex gap-3 sm:gap-4 md:gap-8 mix-blend-difference overflow-x-auto max-w-[65vw] sm:max-w-[60vw] md:max-w-none no-scrollbar safe-left safe-bottom select-none-touch"
+        className="fixed bottom-4 left-3 sm:bottom-6 sm:left-6 md:bottom-8 md:left-8 z-50 flex gap-2 xs:gap-3 sm:gap-4 md:gap-8 mix-blend-difference overflow-x-auto max-w-[55vw] xs:max-w-[60vw] sm:max-w-[60vw] md:max-w-none no-scrollbar safe-left safe-bottom select-none-touch mobile-bottom-nav"
         role="navigation"
         aria-label="Main navigation"
       >
@@ -712,7 +697,7 @@ export default function ArtisticPortfolio() {
           <button
             key={sec}
             onClick={() => handleNavClick(sec)}
-            className={`text-[11px] sm:text-xs md:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-all duration-300 whitespace-nowrap py-2 touch-target
+            className={`text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-all duration-300 whitespace-nowrap py-2 min-w-[36px] xs:min-w-[40px] sm:min-w-[44px] min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] flex items-center justify-center
               ${activeSection === sec ? 'text-white' : 'text-gray-400 hover:text-white active:text-cyan-300'}`}
             aria-current={activeSection === sec ? 'page' : undefined}
           >
@@ -722,11 +707,11 @@ export default function ArtisticPortfolio() {
       </nav>
 
       {/* Socials & Audio */}
-      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50 flex gap-3 sm:gap-4 md:gap-5 mix-blend-difference items-center safe-right safe-bottom">
+      <div className="fixed bottom-4 right-3 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50 flex gap-1 xs:gap-2 sm:gap-4 md:gap-5 mix-blend-difference items-center safe-right safe-bottom mobile-bottom-icons">
         <button 
           onClick={toggleMute}
           onMouseEnter={playHover}
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors touch-target"
+          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
           title={isMuted ? "Enable Sound" : "Mute Sound"}
           aria-label={isMuted ? "Enable Sound" : "Mute Sound"}
           aria-pressed={!isMuted}
@@ -738,7 +723,7 @@ export default function ArtisticPortfolio() {
           href="/resume.pdf" 
           download="Rushi_Jhala_Resume.pdf"
           onMouseEnter={playHover}
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors touch-target" 
+          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center" 
           title="Download Resume"
           aria-label="Download Resume (PDF)"
         >
@@ -746,18 +731,9 @@ export default function ArtisticPortfolio() {
         </a>
 
         <a 
-          href="tel:+19342553153" 
-          onMouseEnter={playHover} 
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors touch-target sm:hidden" 
-          aria-label="Call Phone"
-        >
-          <Phone className="w-4 h-4" />
-        </a>
-
-        <a 
           href="mailto:jhalarushi@gmail.com" 
           onMouseEnter={playHover} 
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors touch-target" 
+          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center" 
           aria-label="Send Email"
         >
           <Mail className="w-4 h-4 md:w-5 md:h-5" />
@@ -766,7 +742,7 @@ export default function ArtisticPortfolio() {
         <a 
           href="https://linkedin.com/in/rushi-jhala-855076224" 
           onMouseEnter={playHover} 
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors touch-target" 
+          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center" 
           target="_blank" 
           rel="noopener noreferrer" 
           aria-label="LinkedIn Profile (opens in new tab)"
@@ -777,7 +753,7 @@ export default function ArtisticPortfolio() {
         <a 
           href="https://github.com/rushijhala" 
           onMouseEnter={playHover} 
-          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors touch-target" 
+          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[44px] min-h-[44px] items-center justify-center" 
           target="_blank"
           rel="noopener noreferrer"
           aria-label="GitHub Profile (opens in new tab)"
@@ -788,7 +764,7 @@ export default function ArtisticPortfolio() {
         <a 
           href="https://x.com/JhalaRushi" 
           onMouseEnter={playHover} 
-          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors touch-target" 
+          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[44px] min-h-[44px] items-center justify-center" 
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Twitter/X Profile (opens in new tab)"
