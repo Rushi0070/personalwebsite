@@ -548,7 +548,7 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
 
   return (
     <div 
-      className="group border-t border-white/20 hover:border-blue-400/50 transition-colors duration-300"
+      className="group border-t border-white/20 hover:border-white/60 transition-colors duration-300"
       onMouseEnter={playHover}
     >
       <div 
@@ -559,9 +559,9 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
         role="button"
         aria-expanded={isExpanded}
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
-          <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
-            <span className="font-mono text-xs md:text-sm text-blue-400/60 font-medium">0{index}</span>
+        <div className="flex flex-col md:flex-row md:items-baseline justify-between gap-2 md:gap-4">
+          <div className="flex items-baseline gap-3 sm:gap-4 md:gap-6">
+            <span className="font-mono text-xs md:text-sm text-gray-500 font-medium">0{index}</span>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-blue-300 transition-colors duration-300">
@@ -596,41 +596,45 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
         </div>
 
         <div className={`overflow-hidden transition-all duration-500 ease-in-out
-          ${isExpanded ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}`}
+          ${isExpanded ? 'max-h-[1400px] opacity-100' : 'max-h-0 opacity-0'}`}
         >
           <div className="pt-6 md:pt-8">
-            {image && (
-              <div className="mb-6 md:mb-8 rounded-lg overflow-hidden border border-white/10">
-                <img 
-                  src={image} 
-                  alt={title}
-                  className="w-full h-auto object-cover max-h-[400px]"
-                  loading="lazy"
-                />
+            <div className="flex flex-col lg:flex-row gap-6 md:gap-8 mb-6 md:mb-8">
+              {image && (
+                <div className="lg:w-2/5 flex-shrink-0 rounded-lg overflow-hidden border border-white/10 self-start">
+                  <img 
+                    src={image} 
+                    alt={title}
+                    className="w-full h-auto object-cover aspect-[4/3]"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+              
+              <div className="lg:w-3/5">
+                <div className="text-gray-200 text-sm md:text-base leading-relaxed mb-4 md:mb-6">
+                  {description}
+                </div>
+
+                {sponsors && (
+                  <p className="text-xs md:text-sm font-mono text-blue-400/80 mb-2">
+                    <span className="text-gray-500">Sponsors:</span> {sponsors}
+                  </p>
+                )}
+
+                {collaborators && (
+                  <p className="text-xs md:text-sm font-mono text-blue-400/80 mb-4 md:mb-6">
+                    <span className="text-gray-500">Team:</span> {collaborators}
+                  </p>
+                )}
               </div>
-            )}
-            
-            <div className="text-gray-200 text-sm md:text-base leading-relaxed mb-4 md:mb-6 max-w-3xl">
-              {description}
             </div>
-
-            {sponsors && (
-              <p className="text-xs md:text-sm font-mono text-blue-400/80 mb-2">
-                <span className="text-gray-500">Sponsors:</span> {sponsors}
-              </p>
-            )}
-
-            {collaborators && (
-              <p className="text-xs md:text-sm font-mono text-blue-400/80 mb-4 md:mb-6">
-                <span className="text-gray-500">Team:</span> {collaborators}
-              </p>
-            )}
 
             <div className="flex flex-wrap gap-2 pb-2">
               {tags.map((t) => (
                 <span 
                   key={t} 
-                  className="text-[10px] md:text-xs font-mono text-gray-300 border border-blue-400/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-blue-500/5 hover:bg-blue-500/10 transition-colors"
+                  className="text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
                 >
                   {t}
                 </span>
