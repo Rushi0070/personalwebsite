@@ -839,7 +839,7 @@ export default function ArtisticPortfolio() {
     switch (activeSection) {
       case 'work': return <WorkSection playHover={playHover} />;
       case 'projects': return <ProjectsSection playHover={playHover} />;
-      case 'builds': return <BuildsSection playHover={playHover} />;
+      case 'Recent Builds': return <BuildsSection playHover={playHover} />;
       case 'about': return <AboutSection />;
       case 'stack': return <StackSection playHover={playHover} />;
       default: return null;
