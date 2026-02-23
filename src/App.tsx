@@ -833,7 +833,7 @@ export default function ArtisticPortfolio() {
   const { isMuted, toggleMute, playHover } = useSound();
   const { isMobile, isLowPower } = useDeviceDetect();
   
-  const navItems = useMemo(() => ['work', 'projects', 'builds', 'about', 'stack'], []);
+  const navItems = useMemo(() => ['work', 'projects', 'Recent Builds', 'about', 'stack'], []);
   
   const handleNavClick = useCallback((sec: string) => {
     setActiveSection(sec);
