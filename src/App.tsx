@@ -524,6 +524,127 @@ const ListItem = memo(({ index, title, subtitle, description, tags, link, playHo
 
 ListItem.displayName = 'ListItem';
 
+// --- BUILD ITEM COMPONENT ---
+interface BuildItemProps {
+  index: string;
+  title: string;
+  subtitle: string;
+  image?: string;
+  description: React.ReactNode;
+  tags: string[];
+  link?: string;
+  collaborators?: string;
+  sponsors?: string;
+  playHover: () => void;
+}
+
+const BuildItem = memo(({ index, title, subtitle, image, description, tags, link, collaborators, sponsors, playHover }: BuildItemProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleClick = () => {
+    setIsExpanded(!isExpanded);
+    playHover();
+  };
+
+  return (
+    <div 
+      className="group border-t border-white/20 hover:border-blue-400/50 transition-colors duration-300"
+      onMouseEnter={playHover}
+    >
+      <div 
+        className="py-5 sm:py-6 md:py-8 cursor-pointer"
+        onClick={handleClick}
+        onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+        tabIndex={0}
+        role="button"
+        aria-expanded={isExpanded}
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
+            <span className="font-mono text-xs md:text-sm text-blue-400/60 font-medium">0{index}</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-blue-300 transition-colors duration-300">
+                  {title}
+                </h3>
+                {link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-gray-500 hover:text-blue-400 transition-colors p-1 hover:bg-white/10 rounded"
+                    title="View repository"
+                    aria-label={`View ${title} repository (opens in new tab)`}
+                  >
+                    <ArrowUpRight className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+              <p className="text-xs md:text-sm font-mono text-blue-400 mt-1 md:mt-2 font-medium">
+                {subtitle}
+              </p>
+            </div>
+          </div>
+
+          <div className="hidden md:flex items-center gap-2 text-xs font-mono text-gray-400 uppercase tracking-widest font-medium group-hover:text-white transition-colors">
+            <span>{isExpanded ? 'Collapse' : 'View Details'}</span>
+            <span className={`inline-block transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+              &#9662;
+            </span>
+          </div>
+        </div>
+
+        <div className={`overflow-hidden transition-all duration-500 ease-in-out
+          ${isExpanded ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}`}
+        >
+          <div className="pt-6 md:pt-8">
+            {image && (
+              <div className="mb-6 md:mb-8 rounded-lg overflow-hidden border border-white/10">
+                <img 
+                  src={image} 
+                  alt={title}
+                  className="w-full h-auto object-cover max-h-[400px]"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            
+            <div className="text-gray-200 text-sm md:text-base leading-relaxed mb-4 md:mb-6 max-w-3xl">
+              {description}
+            </div>
+
+            {sponsors && (
+              <p className="text-xs md:text-sm font-mono text-blue-400/80 mb-2">
+                <span className="text-gray-500">Sponsors:</span> {sponsors}
+              </p>
+            )}
+
+            {collaborators && (
+              <p className="text-xs md:text-sm font-mono text-blue-400/80 mb-4 md:mb-6">
+                <span className="text-gray-500">Team:</span> {collaborators}
+              </p>
+            )}
+
+            <div className="flex flex-wrap gap-2 pb-2">
+              {tags.map((t) => (
+                <span 
+                  key={t} 
+                  className="text-[10px] md:text-xs font-mono text-gray-300 border border-blue-400/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-blue-500/5 hover:bg-blue-500/10 transition-colors"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+BuildItem.displayName = 'BuildItem';
+
 // --- STACK CATEGORY ---
 const StackCategory = memo(({ title, items, playHover }: StackCategory & { playHover: () => void }) => (
   <div onMouseEnter={playHover} className="group">
@@ -603,6 +724,42 @@ const ProjectsSection = memo(({ playHover }: { playHover: () => void }) => (
 
 ProjectsSection.displayName = 'ProjectsSection';
 
+const BuildsSection = memo(({ playHover }: { playHover: () => void }) => (
+  <section className="animate-in fade-in" aria-labelledby="builds-heading">
+    <h2 id="builds-heading" className="text-xs font-mono text-blue-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold">
+      Recent Builds
+    </h2>
+    <div className="w-full">
+      <BuildItem 
+        index="1"
+        title="VitalSync"
+        subtitle="Columbia University Hackathon // Qualcomm"
+        image="/images/vitalsync.png"
+        description={
+          <>
+            <p className="mb-4">
+              Just wrapped up an incredible week at the Columbia University Hackathon, sponsored by Qualcomm, where our team architected VitalSync: a multi-device ecosystem that redefines productivity through on-device edge intelligence. Designed to bridge the gap between deep-work "flow states" and physical well-being, VitalSync leverages the Snapdragon platform to run a dual-model pipeline: a Qwen 6B VLM on the NPU (via ONNX) for deep screen-context analysis and a YOLOv8 model on the integrated GPU for real-time physical activity tracking.
+            </p>
+            <p className="mb-4">
+              The core of VitalSync is accountability; when the system detects procrastination or a vital need for hydration and movement, it triggers a persistent "task-locked" popup that only closes once the vision models verify the task has been completed. This entire experience is managed via a React Native Android remote featuring seamless state persistence and haptic feedback, allowing users to initiate background PC sessions directly from their phones.
+            </p>
+            <p>
+              By optimizing model memory loading to preserve primary compute for daily tasks, we have created a performance "Vital Score" summary system that scales from personal wellness to enterprise-level employee productivity, proving that the future of private, responsive AI belongs on the edge.
+            </p>
+          </>
+        }
+        tags={['Edge AI', 'Snapdragon NPU', 'Qwen 6B VLM', 'YOLOv8', 'ONNX', 'React Native', 'On-Device ML']}
+        link="https://github.com/Rushi0070/VitalSync"
+        sponsors="Qualcomm, Columbia University"
+        collaborators="Ishan Vaghani, Ying Lo, Charisse Lai"
+        playHover={playHover}
+      />
+    </div>
+  </section>
+));
+
+BuildsSection.displayName = 'BuildsSection';
+
 const AboutSection = memo(() => (
   <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 md:gap-16 animate-in fade-in" aria-labelledby="about-heading">
     <div className="lg:col-span-5">
@@ -672,7 +829,7 @@ export default function ArtisticPortfolio() {
   const { isMuted, toggleMute, playHover } = useSound();
   const { isMobile, isLowPower } = useDeviceDetect();
   
-  const navItems = useMemo(() => ['work', 'projects', 'about', 'stack'], []);
+  const navItems = useMemo(() => ['work', 'projects', 'builds', 'about', 'stack'], []);
   
   const handleNavClick = useCallback((sec: string) => {
     setActiveSection(sec);
@@ -683,6 +840,7 @@ export default function ArtisticPortfolio() {
     switch (activeSection) {
       case 'work': return <WorkSection playHover={playHover} />;
       case 'projects': return <ProjectsSection playHover={playHover} />;
+      case 'builds': return <BuildsSection playHover={playHover} />;
       case 'about': return <AboutSection />;
       case 'stack': return <StackSection playHover={playHover} />;
       default: return null;
