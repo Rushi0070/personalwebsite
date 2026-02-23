@@ -564,7 +564,7 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
             <span className="font-mono text-xs md:text-sm text-gray-500 font-medium">0{index}</span>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-blue-300 transition-colors duration-300">
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-cyan-200 transition-colors duration-300">
                   {title}
                 </h3>
                 {link && (
@@ -573,7 +573,7 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-gray-500 hover:text-blue-400 transition-colors p-1 hover:bg-white/10 rounded"
+                    className="text-gray-500 hover:text-cyan-400 transition-colors p-1 hover:bg-white/10 rounded"
                     title="View repository"
                     aria-label={`View ${title} repository (opens in new tab)`}
                   >
@@ -581,7 +581,7 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
                   </a>
                 )}
               </div>
-              <p className="text-xs md:text-sm font-mono text-blue-400 mt-1 md:mt-2 font-medium">
+              <p className="text-xs md:text-sm font-mono text-cyan-400 mt-1 md:mt-2 font-medium">
                 {subtitle}
               </p>
             </div>
@@ -617,13 +617,13 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
                 </div>
 
                 {sponsors && (
-                  <p className="text-xs md:text-sm font-mono text-blue-400/80 mb-2">
+                  <p className="text-xs md:text-sm font-mono text-cyan-400 mb-2">
                     <span className="text-gray-500">Sponsors:</span> {sponsors}
                   </p>
                 )}
 
                 {collaborators && (
-                  <p className="text-xs md:text-sm font-mono text-blue-400/80 mb-4 md:mb-6">
+                  <p className="text-xs md:text-sm font-mono text-cyan-400 mb-4 md:mb-6">
                     <span className="text-gray-500">Team:</span> {collaborators}
                   </p>
                 )}
@@ -730,7 +730,7 @@ ProjectsSection.displayName = 'ProjectsSection';
 
 const BuildsSection = memo(({ playHover }: { playHover: () => void }) => (
   <section className="animate-in fade-in" aria-labelledby="builds-heading">
-    <h2 id="builds-heading" className="text-xs font-mono text-blue-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold">
+    <h2 id="builds-heading" className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold">
       Recent Builds
     </h2>
     <div className="w-full">
