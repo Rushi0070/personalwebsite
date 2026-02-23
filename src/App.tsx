@@ -552,91 +552,99 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
       onMouseEnter={playHover}
     >
       <div 
-        className="py-5 sm:py-6 md:py-8 flex flex-col md:flex-row md:items-baseline justify-between gap-2 md:gap-4 cursor-pointer"
+        className="py-5 sm:py-6 md:py-8 cursor-pointer"
         onClick={handleClick}
         onKeyDown={(e) => e.key === 'Enter' && handleClick()}
         tabIndex={0}
         role="button"
         aria-expanded={isExpanded}
       >
-        <div className="flex items-baseline gap-3 sm:gap-4 md:gap-6 md:w-1/3">
-          <span className="font-mono text-xs md:text-sm text-gray-500 font-medium">0{index}</span>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-cyan-200 transition-colors duration-300">
-                {title}
-              </h3>
-              {link && (
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-gray-500 hover:text-cyan-400 transition-colors p-1 hover:bg-white/10 rounded"
-                  title="View repository"
-                  aria-label={`View ${title} repository (opens in new tab)`}
-                >
-                  <ArrowUpRight className="w-4 h-4" />
-                </a>
-              )}
-            </div>
-            <p className="text-xs md:text-sm font-mono text-cyan-400 mt-1 md:mt-2 font-medium">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-
-        <div className="hidden md:block md:w-1/6 font-mono text-xs text-gray-400 uppercase tracking-widest font-medium group-hover:text-white transition-colors duration-300">
-          {tags?.[0]}
-        </div>
-
-        <div className={`md:w-1/2 overflow-hidden transition-all duration-700 ease-in-out
-          ${isExpanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0 md:group-hover:max-h-[800px] md:group-hover:opacity-100'}`}
-        >
-          <div className="mt-4 md:mt-0">
-            {image && (
-              <div className="mb-4 md:mb-5 rounded-lg overflow-hidden border border-white/10 max-w-sm">
-                <img 
-                  src={image} 
-                  alt={title}
-                  className="w-full h-auto object-cover aspect-[4/3]"
-                  loading="lazy"
-                />
+        <div className="flex flex-col md:flex-row md:items-baseline justify-between gap-2 md:gap-4">
+          <div className="flex items-baseline gap-3 sm:gap-4 md:gap-6 md:w-1/3">
+            <span className="font-mono text-xs md:text-sm text-gray-500 font-medium">0{index}</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-cyan-200 transition-colors duration-300">
+                  {title}
+                </h3>
+                {link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-gray-500 hover:text-cyan-400 transition-colors p-1 hover:bg-white/10 rounded"
+                    title="View repository"
+                    aria-label={`View ${title} repository (opens in new tab)`}
+                  >
+                    <ArrowUpRight className="w-4 h-4" />
+                  </a>
+                )}
               </div>
-            )}
-
-            <div className="text-gray-200 text-sm md:text-base leading-relaxed mb-3 md:mb-4 max-w-lg">
-              {description}
+              <p className="text-xs md:text-sm font-mono text-cyan-400 mt-1 md:mt-2 font-medium">
+                {subtitle}
+              </p>
             </div>
+          </div>
 
-            {sponsors && (
-              <p className="text-xs md:text-sm font-mono text-cyan-400 mb-1">
-                <span className="text-gray-500">Sponsors:</span> {sponsors}
-              </p>
-            )}
+          <div className="hidden md:block md:w-1/6 font-mono text-xs text-gray-400 uppercase tracking-widest font-medium group-hover:text-white transition-colors duration-300">
+            {tags?.[0]}
+          </div>
 
-            {collaborators && (
-              <p className="text-xs md:text-sm font-mono text-cyan-400 mb-3 md:mb-4">
-                <span className="text-gray-500">Team:</span> {collaborators}
-              </p>
-            )}
+          <div className="hidden md:block md:w-1/2" />
 
-            <div className="flex flex-wrap gap-2 pb-2">
-              {tags.slice(1).map((t) => (
-                <span 
-                  key={t} 
-                  className="text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-                >
-                  {t}
-                </span>
-              ))}
+          {link && (
+            <ArrowUpRight className="hidden md:block w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white group-hover:-translate-y-1 group-hover:translate-x-1 transition-all duration-300 flex-shrink-0" />
+          )}
+        </div>
+
+        <div className={`overflow-hidden transition-all duration-700 ease-in-out
+          ${isExpanded ? 'max-h-[900px] opacity-100' : 'max-h-0 opacity-0 md:group-hover:max-h-[900px] md:group-hover:opacity-100'}`}
+        >
+          <div className="pt-6 md:pt-8">
+            <div className="flex flex-col md:flex-row gap-6 md:gap-10">
+              {image && (
+                <div className="md:w-2/5 flex-shrink-0 rounded-lg overflow-hidden border border-white/10 self-start">
+                  <img 
+                    src={image} 
+                    alt={title}
+                    className="w-full h-auto object-cover aspect-[4/3]"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+
+              <div className="md:w-3/5">
+                <div className="text-gray-200 text-sm md:text-base leading-relaxed mb-4 md:mb-5">
+                  {description}
+                </div>
+
+                {sponsors && (
+                  <p className="text-xs md:text-sm font-mono text-cyan-400 mb-1">
+                    <span className="text-gray-500">Sponsors:</span> {sponsors}
+                  </p>
+                )}
+
+                {collaborators && (
+                  <p className="text-xs md:text-sm font-mono text-cyan-400 mb-4 md:mb-5">
+                    <span className="text-gray-500">Team:</span> {collaborators}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {tags.slice(1).map((t) => (
+                    <span 
+                      key={t} 
+                      className="text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-        {link && (
-          <ArrowUpRight className="hidden md:block w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white group-hover:-translate-y-1 group-hover:translate-x-1 transition-all duration-300 flex-shrink-0" />
-        )}
       </div>
     </div>
   );
