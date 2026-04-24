@@ -30,6 +30,198 @@ interface StackCategory {
   items: string[];
 }
 
+// ============================================
+//  ANIMATION PRIMITIVES
+//  Applying Josh Comeau's animation principles:
+//  - Signature cubic-bezier(0.41, 0.1, 0.13, 1)
+//  - Asymmetric timing (snappy in, relaxed out)
+//  - Spring physics for motion (transforms only)
+//  - Respect prefers-reduced-motion
+// ============================================
+
+const usePrefersReducedMotion = () => {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReduced(mq.matches);
+    update();
+    mq.addEventListener?.('change', update);
+    return () => mq.removeEventListener?.('change', update);
+  }, []);
+  return reduced;
+};
+
+// Split text into per-letter spans that stagger-reveal.
+// Uses letterReveal keyframe — springs in from below with blur settle.
+const SplitText = memo(({
+  text,
+  className = '',
+  delay = 0,
+  stepMs = 35,
+  keyId,
+}: {
+  text: string;
+  className?: string;
+  delay?: number;
+  stepMs?: number;
+  keyId?: string | number;
+}) => {
+  const reduced = usePrefersReducedMotion();
+  if (reduced) {
+    return <span className={className}>{text}</span>;
+  }
+  const words = text.split(' ');
+  let charCounter = 0;
+  return (
+    <span className={className} aria-label={text}>
+      {words.map((word, wi) => (
+        <span key={`${keyId ?? ''}-w-${wi}`} className="inline-block whitespace-nowrap">
+          {[...word].map((ch) => {
+            const idx = charCounter++;
+            return (
+              <span
+                key={`${keyId ?? ''}-c-${idx}`}
+                className="letter-reveal"
+                style={{ animationDelay: `${delay + idx * stepMs}ms` }}
+                aria-hidden="true"
+              >
+                {ch}
+              </span>
+            );
+          })}
+          {wi < words.length - 1 && (
+            <span key={`${keyId ?? ''}-s-${wi}`} className="inline-block">&nbsp;</span>
+          )}
+        </span>
+      ))}
+    </span>
+  );
+});
+SplitText.displayName = 'SplitText';
+
+// Boop: Josh's signature hover-and-return spring.
+// The icon briefly rotates + scales, then springs back — perfect for playful icons.
+const Boop = memo(({
+  children,
+  className = '',
+  timeoutMs = 600,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  timeoutMs?: number;
+}) => {
+  const [booping, setBooping] = useState(false);
+  const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (!booping) return;
+    const t = window.setTimeout(() => setBooping(false), timeoutMs);
+    return () => window.clearTimeout(t);
+  }, [booping, timeoutMs]);
+
+  const handleEnter = useCallback(() => {
+    if (reduced) return;
+    setBooping(true);
+  }, [reduced]);
+
+  return (
+    <span
+      className={`boop-wrap ${booping ? 'booping' : ''} ${className}`}
+      onMouseEnter={handleEnter}
+    >
+      {children}
+    </span>
+  );
+});
+Boop.displayName = 'Boop';
+
+// Magnetic: element drifts toward cursor with a spring settle on leave.
+// Applied to interactive targets — desktop only, skipped on touch/low-power.
+const useMagnetic = <T extends HTMLElement>(
+  strength = 0.35,
+  enabled = true
+) => {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    const el = ref.current;
+    if (!el) return;
+
+    const move = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = (e.clientX - cx) * strength;
+      const dy = (e.clientY - cy) * strength;
+      el.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0)`;
+    };
+    const leave = () => {
+      el.style.transform = 'translate3d(0, 0, 0)';
+    };
+
+    el.addEventListener('mousemove', move);
+    el.addEventListener('mouseleave', leave);
+    return () => {
+      el.removeEventListener('mousemove', move);
+      el.removeEventListener('mouseleave', leave);
+      el.style.transform = '';
+    };
+  }, [strength, enabled]);
+  return ref;
+};
+
+// Magnetic-wrapper component — binds the hook to a <span> that wraps any child.
+const Magnetic = memo(({
+  children,
+  strength = 0.35,
+  enabled = true,
+  className = '',
+}: {
+  children: React.ReactNode;
+  strength?: number;
+  enabled?: boolean;
+  className?: string;
+}) => {
+  const ref = useMagnetic<HTMLSpanElement>(strength, enabled);
+  return (
+    <span ref={ref} className={`magnetic inline-flex ${className}`}>
+      {children}
+    </span>
+  );
+});
+Magnetic.displayName = 'Magnetic';
+
+// Live clock — animated detail next to the location badge.
+// Updates every second, shows EST time (for Long Island, NY).
+const LiveClock = memo(() => {
+  const [time, setTime] = useState(() => formatESTTime(new Date()));
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setTime(formatESTTime(new Date()));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <span className="font-mono tabular-nums" aria-live="off">
+      {time}
+    </span>
+  );
+});
+LiveClock.displayName = 'LiveClock';
+
+const formatESTTime = (d: Date) => {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'America/New_York',
+    }).format(d);
+  } catch {
+    return d.toTimeString().slice(0, 5);
+  }
+};
+
 // --- DEVICE DETECTION HOOK ---
 const useDeviceDetect = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -437,6 +629,8 @@ FlowFieldBackground.displayName = 'FlowFieldBackground';
 // --- LIST ITEM COMPONENT ---
 const ListItem = memo(({ index, title, subtitle, description, tags, link, playHover, date, companyUrl }: ListItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  // Stagger delay based on row index — each row cascades in 120ms after the previous.
+  const revealDelay = (parseInt(index, 10) - 1) * 120 + 250;
 
   const handleClick = () => {
     setIsExpanded(!isExpanded);
@@ -444,12 +638,13 @@ const ListItem = memo(({ index, title, subtitle, description, tags, link, playHo
   };
 
   return (
-    <div 
-      className="group border-t border-white/20 hover:border-white/60 transition-colors duration-300"
+    <div
+      className="group border-t border-white/20 hover:border-white/60 transition-colors duration-300 stagger-reveal"
+      style={{ animationDelay: `${revealDelay}ms` }}
       onMouseEnter={playHover}
     >
-      <div 
-        className="py-5 sm:py-6 md:py-8 flex flex-col md:flex-row md:items-baseline justify-between gap-2 md:gap-4 cursor-pointer"
+      <div
+        className="py-5 sm:py-6 md:py-8 flex flex-col md:flex-row md:items-baseline justify-between gap-2 md:gap-4 cursor-pointer row-lift"
         onClick={handleClick}
         onKeyDown={(e) => e.key === 'Enter' && handleClick()}
         tabIndex={0}
@@ -473,7 +668,9 @@ const ListItem = memo(({ index, title, subtitle, description, tags, link, playHo
                   title="Visit company website"
                   aria-label={`Visit ${title} website (opens in new tab)`}
                 >
-                  <ArrowUpRight className="w-4 h-4" />
+                  <Boop>
+                    <ArrowUpRight className="w-4 h-4" />
+                  </Boop>
                 </a>
               )}
             </div>
@@ -492,7 +689,7 @@ const ListItem = memo(({ index, title, subtitle, description, tags, link, playHo
         </div>
 
         <div className="hidden md:block md:w-1/6 font-mono text-xs text-gray-400 uppercase tracking-widest font-medium group-hover:text-white transition-colors">
-          {tags?.[0]} 
+          {tags?.[0]}
         </div>
 
         {/* Mobile: Always show on tap, Desktop: Show on hover */}
@@ -504,18 +701,20 @@ const ListItem = memo(({ index, title, subtitle, description, tags, link, playHo
           </div>
           <div className="flex flex-wrap gap-2 pb-2">
             {tags.slice(1).map((t) => (
-              <span 
-                key={t} 
-                className="text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+              <span
+                key={t}
+                className="tag-pop text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 hover:border-cyan-400/60 hover:text-cyan-100"
               >
                 {t}
               </span>
             ))}
           </div>
         </div>
-        
+
         {link && (
-          <ArrowUpRight className="hidden md:block w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white group-hover:-translate-y-1 group-hover:translate-x-1 transition-all duration-300 flex-shrink-0" />
+          <Boop>
+            <ArrowUpRight className="hidden md:block w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white transition-colors duration-300 flex-shrink-0" />
+          </Boop>
         )}
       </div>
     </div>
@@ -540,6 +739,7 @@ interface BuildItemProps {
 
 const BuildItem = memo(({ index, title, subtitle, image, description, tags, link, collaborators, sponsors, playHover }: BuildItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const revealDelay = (parseInt(index, 10) - 1) * 120 + 250;
 
   const handleClick = () => {
     setIsExpanded(!isExpanded);
@@ -547,12 +747,13 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
   };
 
   return (
-    <div 
-      className="group border-t border-white/20 hover:border-white/60 transition-colors duration-300"
+    <div
+      className="group border-t border-white/20 hover:border-white/60 transition-colors duration-300 stagger-reveal"
+      style={{ animationDelay: `${revealDelay}ms` }}
       onMouseEnter={playHover}
     >
-      <div 
-        className="py-5 sm:py-6 md:py-8 cursor-pointer"
+      <div
+        className="py-5 sm:py-6 md:py-8 cursor-pointer row-lift"
         onClick={handleClick}
         onKeyDown={(e) => e.key === 'Enter' && handleClick()}
         tabIndex={0}
@@ -577,7 +778,9 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
                     title="View repository"
                     aria-label={`View ${title} repository (opens in new tab)`}
                   >
-                    <ArrowUpRight className="w-4 h-4" />
+                    <Boop>
+                      <ArrowUpRight className="w-4 h-4" />
+                    </Boop>
                   </a>
                 )}
               </div>
@@ -594,7 +797,9 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
           <div className="hidden md:block md:w-1/2" />
 
           {link && (
-            <ArrowUpRight className="hidden md:block w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white group-hover:-translate-y-1 group-hover:translate-x-1 transition-all duration-300 flex-shrink-0" />
+            <Boop>
+              <ArrowUpRight className="hidden md:block w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white transition-colors duration-300 flex-shrink-0" />
+            </Boop>
           )}
         </div>
 
@@ -605,8 +810,8 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
             <div className="flex flex-col md:flex-row gap-6 md:gap-10">
               {image && (
                 <div className="md:w-2/5 flex-shrink-0 rounded-lg overflow-hidden border border-white/10 self-start">
-                  <img 
-                    src={image} 
+                  <img
+                    src={image}
                     alt={title}
                     className="w-full h-auto object-cover aspect-[4/3]"
                     loading="lazy"
@@ -633,9 +838,9 @@ const BuildItem = memo(({ index, title, subtitle, image, description, tags, link
 
                 <div className="flex flex-wrap gap-2">
                   {tags.slice(1).map((t) => (
-                    <span 
-                      key={t} 
-                      className="text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                    <span
+                      key={t}
+                      className="tag-pop text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 hover:border-cyan-400/60 hover:text-cyan-100"
                     >
                       {t}
                     </span>
@@ -655,13 +860,17 @@ BuildItem.displayName = 'BuildItem';
 // --- STACK CATEGORY ---
 const StackCategory = memo(({ title, items, playHover }: StackCategory & { playHover: () => void }) => (
   <div onMouseEnter={playHover} className="group">
-    <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 sm:mb-6 pb-2 border-b border-white/10 group-hover:border-white/40 transition-colors inline-block">
+    <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 sm:mb-6 pb-2 border-b border-white/10 group-hover:border-cyan-400/60 transition-colors inline-block">
       {title}
     </h3>
     <ul className="space-y-2 sm:space-y-3">
-      {items.map(item => (
-        <li key={item} className="text-sm text-gray-300 hover:text-white transition-colors cursor-default block font-medium py-1">
-          {item}
+      {items.map((item, i) => (
+        <li
+          key={item}
+          className="stagger-reveal text-sm text-gray-300 hover:text-cyan-100 transition-colors cursor-default block font-medium py-1"
+          style={{ animationDelay: `${300 + i * 70}ms` }}
+        >
+          <span className="tag-pop inline-block">{item}</span>
         </li>
       ))}
     </ul>
@@ -670,14 +879,36 @@ const StackCategory = memo(({ title, items, playHover }: StackCategory & { playH
 
 StackCategory.displayName = 'StackCategory';
 
+// --- SECTION HEADING ---
+// Reusable H2 with SplitText reveal + drawn underline underneath.
+// The `keyId` forces React to remount the spans when the section key changes,
+// so each section re-animates on tab switch.
+const SectionHeading = memo(({
+  id,
+  text,
+  keyId,
+  className = 'text-xs font-mono text-gray-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold',
+}: {
+  id: string;
+  text: string;
+  keyId: string;
+  className?: string;
+}) => (
+  <div className="mb-6 sm:mb-8 md:mb-12">
+    <h2 id={id} className={className.replace(/mb-\S+/g, '').trim() + ' pb-3 inline-block'}>
+      <SplitText text={text} keyId={keyId} delay={100} />
+    </h2>
+    <span className="underline-draw max-w-[280px] block" aria-hidden="true" />
+  </div>
+));
+SectionHeading.displayName = 'SectionHeading';
+
 // --- SECTION COMPONENTS ---
 const WorkSection = memo(({ playHover }: { playHover: () => void }) => (
   <section className="animate-in fade-in" aria-labelledby="work-heading">
-    <h2 id="work-heading" className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold">
-      Professional Experience
-    </h2>
+    <SectionHeading id="work-heading" text="Professional Experience" keyId="work" />
     <div className="w-full">
-      <ListItem 
+      <ListItem
         index="1"
         title="Aivid Tech Vision"
         subtitle="Computer Vision Intern"
@@ -702,11 +933,9 @@ WorkSection.displayName = 'WorkSection';
 
 const ProjectsSection = memo(({ playHover }: { playHover: () => void }) => (
   <section className="animate-in fade-in" aria-labelledby="projects-heading">
-    <h2 id="projects-heading" className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold">
-      Academic & Personal Projects
-    </h2>
+    <SectionHeading id="projects-heading" text="Academic & Personal Projects" keyId="projects" />
     <div className="w-full">
-      <ListItem 
+      <ListItem
         index="1"
         title="SEC Alpha Gen"
         subtitle="Alphathon 2025"
@@ -716,7 +945,7 @@ const ProjectsSection = memo(({ playHover }: { playHover: () => void }) => (
         companyUrl="https://github.com/Rushi0070/sec-investment-signals"
         playHover={playHover}
       />
-      <ListItem 
+      <ListItem
         index="2"
         title="Uber Demand Forecast"
         subtitle="MLOps Pipeline"
@@ -733,11 +962,9 @@ ProjectsSection.displayName = 'ProjectsSection';
 
 const BuildsSection = memo(({ playHover }: { playHover: () => void }) => (
   <section className="animate-in fade-in" aria-labelledby="builds-heading">
-    <h2 id="builds-heading" className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold">
-      Recent Builds
-    </h2>
+    <SectionHeading id="builds-heading" text="Recent Builds" keyId="builds" />
     <div className="w-full">
-      <BuildItem 
+      <BuildItem
         index="1"
         title="VitalSync"
         subtitle="Columbia University Hackathon // Qualcomm"
@@ -771,11 +998,14 @@ const AboutSection = memo(() => (
   <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 md:gap-16 animate-in fade-in" aria-labelledby="about-heading">
     <div className="lg:col-span-5">
       <h2 id="about-heading" className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-normal leading-tight mb-6 sm:mb-8 text-white text-balance">
-        Bridging <br className="hidden sm:block"/><span className="text-gray-500">Theory</span> & <br className="hidden sm:block"/>Production.
+        <span className="block"><SplitText text="Bridging" keyId="about-1" delay={100} stepMs={45} /></span>
+        <span className="block text-gray-500"><SplitText text="Theory" keyId="about-2" delay={450} stepMs={45} /></span>
+        <span className="block"><SplitText text="& Production." keyId="about-3" delay={800} stepMs={45} /></span>
       </h2>
+      <span className="underline-draw max-w-[200px] block" aria-hidden="true" style={{ animationDelay: '1.4s' }} />
     </div>
     <div className="lg:col-span-7 space-y-8 sm:space-y-12 md:space-y-16">
-      <div>
+      <div className="stagger-reveal" style={{ animationDelay: '600ms' }}>
         <p className="text-base sm:text-lg md:text-xl font-normal leading-relaxed text-gray-200 mb-6 sm:mb-8">
           I am a Data Science Graduate Student specializing in Computer Vision and NLP. My work focuses on building robust, scalable intelligent systems for high-stakes environments like FinTech and Industrial IoT.
         </p>
@@ -792,7 +1022,7 @@ const AboutSection = memo(() => (
           </div>
         </div>
       </div>
-      <div className="space-y-4 border-t border-white/20 pt-6 sm:pt-8">
+      <div className="space-y-4 border-t border-white/20 pt-6 sm:pt-8 stagger-reveal" style={{ animationDelay: '800ms' }}>
         <h3 className="text-base sm:text-lg font-bold text-white">Leadership Impact</h3>
         <p className="text-sm md:text-base text-gray-300 font-normal leading-relaxed">
           As Core Committee Member (ML) at ACM Student Chapter PDEU, I organized a two-day DSA workshop covering C++, linear structures, and graph algorithms for 100+ students, and facilitated peer learning sessions for algorithmic problem-solving.
@@ -814,12 +1044,14 @@ const StackSection = memo(({ playHover }: { playHover: () => void }) => {
 
   return (
     <section className="animate-in fade-in" aria-labelledby="stack-heading">
-      <h2 id="stack-heading" className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold">
-        Technical Arsenal
-      </h2>
+      <SectionHeading id="stack-heading" text="Technical Arsenal" keyId="stack" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 md:gap-12 lg:gap-16">
         {categories.map((cat, i) => (
-          <div key={cat.title} className={`stagger-${i + 1}`}>
+          <div
+            key={cat.title}
+            className="stagger-reveal"
+            style={{ animationDelay: `${250 + i * 120}ms` }}
+          >
             <StackCategory {...cat} playHover={playHover} />
           </div>
         ))}
@@ -830,14 +1062,50 @@ const StackSection = memo(({ playHover }: { playHover: () => void }) => {
 
 StackSection.displayName = 'StackSection';
 
+// --- ICON BUTTON (composed: Magnetic outer + Boop inner) ---
+// Keeps hover target steady (outer doesn't transform) while the icon
+// does the playful boop. Magnetic adds cursor-following drift on desktop.
+const IconLink = memo(({
+  children,
+  enableMagnetic,
+  ...rest
+}: React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+  children: React.ReactNode;
+  enableMagnetic: boolean;
+}) => (
+  <a {...rest}>
+    <Magnetic enabled={enableMagnetic} strength={0.3}>
+      <Boop>{children}</Boop>
+    </Magnetic>
+  </a>
+));
+IconLink.displayName = 'IconLink';
+
+const IconButton = memo(({
+  children,
+  enableMagnetic,
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  children: React.ReactNode;
+  enableMagnetic: boolean;
+}) => (
+  <button {...rest}>
+    <Magnetic enabled={enableMagnetic} strength={0.3}>
+      <Boop>{children}</Boop>
+    </Magnetic>
+  </button>
+));
+IconButton.displayName = 'IconButton';
+
 // --- MAIN COMPONENT ---
 export default function ArtisticPortfolio() {
   const [activeSection, setActiveSection] = useState('work');
   const { isMuted, toggleMute, playHover } = useSound();
   const { isMobile, isLowPower } = useDeviceDetect();
-  
+  const enableMagnetic = !isMobile && !isLowPower;
+
   const navItems = useMemo(() => ['work', 'projects', 'Recent Builds', 'about', 'stack'], []);
-  
+
   const handleNavClick = useCallback((sec: string) => {
     setActiveSection(sec);
     playHover();
@@ -857,27 +1125,27 @@ export default function ArtisticPortfolio() {
   return (
     <div className="min-h-screen min-h-[100dvh] text-white font-sans selection:bg-cyan-500 selection:text-black overflow-x-hidden bg-black">
       <FlowFieldBackground isMobile={isMobile} isLowPower={isLowPower} />
-      
+
       {/* Skip to main content for accessibility */}
-      <a 
-        href="#main-content" 
+      <a
+        href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:bg-cyan-500 focus:text-black focus:px-4 focus:py-2 focus:rounded"
       >
         Skip to main content
       </a>
-      
+
       {!isLowPower && (
-        <div 
+        <div
           className="fixed inset-0 pointer-events-none z-[1] opacity-20 brightness-100 contrast-150 mix-blend-overlay"
           style={{ backgroundImage: "url('https://grainy-gradients.vercel.app/noise.svg')" }}
           aria-hidden="true"
         />
       )}
 
-      {/* Header - Left */}
+      {/* Header - Left: one-time split-letter reveal on first load */}
       <header className="fixed top-4 left-4 sm:top-6 sm:left-6 md:top-8 md:left-8 z-50 mix-blend-difference safe-left safe-top mobile-header-left">
         <h1 className="text-sm md:text-base font-bold tracking-widest uppercase text-white truncate">
-          Rushi Jhala
+          <SplitText text="Rushi Jhala" keyId="name" delay={150} stepMs={55} />
         </h1>
         <p className="text-[10px] md:text-xs font-mono text-gray-300 mt-1 font-medium leading-relaxed">
           <span className="hidden xs:inline">Stony Brook University</span>
@@ -889,114 +1157,133 @@ export default function ArtisticPortfolio() {
         </p>
       </header>
 
-      {/* Header - Right */}
+      {/* Header - Right: status dot gets ripple rings, location row shows live clock */}
       <div className="fixed top-4 right-4 sm:top-6 sm:right-6 md:top-8 md:right-8 z-50 mix-blend-difference text-right safe-right safe-top mobile-header-right">
         <div className="flex items-center justify-end gap-1.5 sm:gap-2">
-          <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-400 rounded-full pulse-glow flex-shrink-0" />
+          <span className="relative w-1.5 h-1.5 md:w-2 md:h-2 flex-shrink-0">
+            <span className="absolute inset-0 bg-green-400 rounded-full pulse-glow" />
+            {!isLowPower && <span className="absolute inset-0 ripple-ring" aria-hidden="true" />}
+          </span>
           <span className="text-[8px] xs:text-[9px] sm:text-[10px] md:text-xs font-mono tracking-wider sm:tracking-widest uppercase text-white font-bold leading-tight">
             <span className="hidden xs:inline">Seeking Summer 2026 Internship</span>
             <span className="xs:hidden">Open to Work</span>
           </span>
         </div>
-        <p className="hidden sm:flex text-[10px] md:text-xs font-mono text-gray-300 mt-1 font-medium items-center justify-end gap-1">
+        <p className="hidden sm:flex text-[10px] md:text-xs font-mono text-gray-300 mt-1 font-medium items-center justify-end gap-1.5">
           <MapPin className="w-3 h-3" />
-          Long Island, NY
+          <span>Long Island, NY</span>
+          <span className="text-gray-500">·</span>
+          <LiveClock />
         </p>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation: active item shimmers, all items get magnetic drift on desktop */}
       <nav
         className="fixed bottom-4 sm:bottom-6 md:bottom-8 left-1/2 sm:left-6 md:left-8 -translate-x-1/2 sm:translate-x-0 z-50 flex gap-3 sm:gap-4 md:gap-8 mix-blend-difference overflow-x-auto max-w-[calc(100vw-1rem)] sm:max-w-none no-scrollbar safe-left safe-bottom select-none-touch"
         role="navigation"
         aria-label="Main navigation"
       >
-        {navItems.map((sec) => (
-          <button
-            key={sec}
-            onClick={() => handleNavClick(sec)}
-            className={`text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-all duration-300 whitespace-nowrap py-2 px-1 min-h-[36px] sm:min-h-[44px] flex items-center justify-center
-              ${activeSection === sec ? 'text-white' : 'text-gray-400 hover:text-white active:text-cyan-300'}`}
-            aria-current={activeSection === sec ? 'page' : undefined}
-          >
-            {sec}
-          </button>
-        ))}
+        {navItems.map((sec) => {
+          const isActive = activeSection === sec;
+          return (
+            <button
+              key={sec}
+              onClick={() => handleNavClick(sec)}
+              onMouseEnter={playHover}
+              className={`relative text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-colors duration-300 whitespace-nowrap py-2 px-1 min-h-[36px] sm:min-h-[44px] flex items-center justify-center
+                ${isActive ? 'text-white' : 'text-gray-400 hover:text-white active:text-cyan-300'}`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <Magnetic enabled={enableMagnetic} strength={0.4}>
+                <span className={isActive ? 'shimmer-text' : ''}>{sec}</span>
+              </Magnetic>
+            </button>
+          );
+        })}
       </nav>
 
-      {/* Socials & Audio */}
+      {/* Socials & Audio: each icon gets Boop + Magnetic-on-desktop */}
       <div className="fixed bottom-20 sm:bottom-6 md:bottom-8 left-1/2 sm:left-auto sm:right-6 md:right-8 -translate-x-1/2 sm:translate-x-0 z-50 flex gap-3 sm:gap-4 md:gap-5 mix-blend-difference items-center safe-bottom sm:safe-right">
-        <button 
+        <IconButton
           onClick={toggleMute}
           onMouseEnter={playHover}
+          enableMagnetic={enableMagnetic}
           className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
           title={isMuted ? "Enable Sound" : "Mute Sound"}
           aria-label={isMuted ? "Enable Sound" : "Mute Sound"}
           aria-pressed={!isMuted}
         >
           {isMuted ? <VolumeX className="w-4 h-4 md:w-5 md:h-5" /> : <Volume2 className="w-4 h-4 md:w-5 md:h-5" />}
-        </button>
+        </IconButton>
 
-        <a 
-          href="/resume.pdf" 
+        <IconLink
+          href="/resume.pdf"
           download="Rushi_Jhala_Resume.pdf"
           onMouseEnter={playHover}
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center" 
+          enableMagnetic={enableMagnetic}
+          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
           title="Download Resume"
           aria-label="Download Resume (PDF)"
         >
           <Download className="w-4 h-4 md:w-5 md:h-5" />
-        </a>
+        </IconLink>
 
-        <a 
-          href="mailto:jhalarushi@gmail.com" 
-          onMouseEnter={playHover} 
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center" 
+        <IconLink
+          href="mailto:jhalarushi@gmail.com"
+          onMouseEnter={playHover}
+          enableMagnetic={enableMagnetic}
+          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
           aria-label="Send Email"
         >
           <Mail className="w-4 h-4 md:w-5 md:h-5" />
-        </a>
-        
-        <a 
-          href="https://linkedin.com/in/rushi-jhala-855076224" 
-          onMouseEnter={playHover} 
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center" 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        </IconLink>
+
+        <IconLink
+          href="https://linkedin.com/in/rushi-jhala-855076224"
+          onMouseEnter={playHover}
+          enableMagnetic={enableMagnetic}
+          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
+          target="_blank"
+          rel="noopener noreferrer"
           aria-label="LinkedIn Profile (opens in new tab)"
         >
           <Linkedin className="w-4 h-4 md:w-5 md:h-5" />
-        </a>
-        
-        <a 
-          href="https://github.com/rushijhala" 
-          onMouseEnter={playHover} 
-          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[44px] min-h-[44px] items-center justify-center" 
+        </IconLink>
+
+        <IconLink
+          href="https://github.com/rushijhala"
+          onMouseEnter={playHover}
+          enableMagnetic={enableMagnetic}
+          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[44px] min-h-[44px] items-center justify-center"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="GitHub Profile (opens in new tab)"
         >
           <Github className="w-4 h-4 md:w-5 md:h-5" />
-        </a>
-        
-        <a 
-          href="https://x.com/JhalaRushi" 
-          onMouseEnter={playHover} 
-          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[44px] min-h-[44px] items-center justify-center" 
+        </IconLink>
+
+        <IconLink
+          href="https://x.com/JhalaRushi"
+          onMouseEnter={playHover}
+          enableMagnetic={enableMagnetic}
+          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[44px] min-h-[44px] items-center justify-center"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Twitter/X Profile (opens in new tab)"
         >
           <Twitter className="w-4 h-4 md:w-5 md:h-5" />
-        </a>
+        </IconLink>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content — key on activeSection forces re-mount so reveal animations replay */}
       <main
         id="main-content"
         className="relative z-10 pt-24 sm:pt-28 pb-40 sm:pb-32 md:pb-40 px-4 sm:px-6 md:px-12 lg:px-24 max-w-7xl mx-auto min-h-screen min-h-[100dvh] flex flex-col justify-center"
         role="main"
       >
-        {renderSection}
+        <div key={activeSection}>
+          {renderSection}
+        </div>
       </main>
       </div>
   );
