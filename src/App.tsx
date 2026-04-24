@@ -905,8 +905,8 @@ export default function ArtisticPortfolio() {
       </div>
 
       {/* Navigation */}
-      <nav 
-        className="fixed bottom-4 left-3 sm:bottom-6 sm:left-6 md:bottom-8 md:left-8 z-50 flex gap-2 xs:gap-3 sm:gap-4 md:gap-8 mix-blend-difference overflow-x-auto max-w-[55vw] xs:max-w-[60vw] sm:max-w-[60vw] md:max-w-none no-scrollbar safe-left safe-bottom select-none-touch mobile-bottom-nav"
+      <nav
+        className="fixed bottom-4 sm:bottom-6 md:bottom-8 left-1/2 sm:left-6 md:left-8 -translate-x-1/2 sm:translate-x-0 z-50 flex gap-3 sm:gap-4 md:gap-8 mix-blend-difference overflow-x-auto max-w-[calc(100vw-1rem)] sm:max-w-none no-scrollbar safe-left safe-bottom select-none-touch"
         role="navigation"
         aria-label="Main navigation"
       >
@@ -914,7 +914,7 @@ export default function ArtisticPortfolio() {
           <button
             key={sec}
             onClick={() => handleNavClick(sec)}
-            className={`text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-all duration-300 whitespace-nowrap py-2 min-w-[36px] xs:min-w-[40px] sm:min-w-[44px] min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] flex items-center justify-center
+            className={`text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-all duration-300 whitespace-nowrap py-2 px-1 min-h-[36px] sm:min-h-[44px] flex items-center justify-center
               ${activeSection === sec ? 'text-white' : 'text-gray-400 hover:text-white active:text-cyan-300'}`}
             aria-current={activeSection === sec ? 'page' : undefined}
           >
@@ -924,7 +924,7 @@ export default function ArtisticPortfolio() {
       </nav>
 
       {/* Socials & Audio */}
-      <div className="fixed bottom-4 right-3 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50 flex gap-1 xs:gap-2 sm:gap-4 md:gap-5 mix-blend-difference items-center safe-right safe-bottom mobile-bottom-icons">
+      <div className="fixed bottom-20 sm:bottom-6 md:bottom-8 left-1/2 sm:left-auto sm:right-6 md:right-8 -translate-x-1/2 sm:translate-x-0 z-50 flex gap-3 sm:gap-4 md:gap-5 mix-blend-difference items-center safe-bottom sm:safe-right">
         <button 
           onClick={toggleMute}
           onMouseEnter={playHover}
@@ -991,9 +991,9 @@ export default function ArtisticPortfolio() {
       </div>
 
       {/* Main Content */}
-      <main 
+      <main
         id="main-content"
-        className="relative z-10 pt-24 sm:pt-28 pb-28 sm:pb-32 md:pb-40 px-4 sm:px-6 md:px-12 lg:px-24 max-w-7xl mx-auto min-h-screen min-h-[100dvh] flex flex-col justify-center"
+        className="relative z-10 pt-24 sm:pt-28 pb-40 sm:pb-32 md:pb-40 px-4 sm:px-6 md:px-12 lg:px-24 max-w-7xl mx-auto min-h-screen min-h-[100dvh] flex flex-col justify-center"
         role="main"
       >
         {renderSection}
