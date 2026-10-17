@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CONFIG, EPOCH0, INTRO, LINKS, PERSON, RUN_END } from '../data';
+import { CONFIG, EPOCH0, INTRO, LINKS, LOOKING_FOR, PERSON, RUN_END } from '../data';
 import type { Checkpoint } from '../data';
 import { SECTIONS, entriesIn, fileOf, shownEntry } from '../routes';
 import type { Route } from '../routes';
@@ -111,6 +111,12 @@ function About({ run, now, gh, theme, reduceMotion, trainKey, hl }: Props) {
           MS Data Science, Stony Brook University <span className="lede-focus">· computer vision · nlp · edge ai</span>
         </p>
         <p className="intro">{mark(INTRO, hl)}</p>
+        <p className="avail">
+          <i aria-hidden="true" /> {LOOKING_FOR}{' '}
+          <button type="button" onClick={() => run('open contact')}>
+            get in touch →
+          </button>
+        </p>
         <p className="actions">
           <button type="button" className="key" onClick={() => run('cd projects')}>
             see projects →
@@ -318,6 +324,9 @@ function Skills({ hl, run }: { hl: string; run: (cmd: string) => void }) {
 function Contact({ run }: { run: (cmd: string) => void }) {
   return (
     <div className="v-contact">
+      <p className="contact-avail">
+        <i aria-hidden="true" /> {LOOKING_FOR}
+      </p>
       <p className="contact-line">Email is the quickest way to reach me.</p>
       <p className="contact-mail">
         <button type="button" onClick={() => run('mail')}>

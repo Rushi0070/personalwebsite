@@ -15,6 +15,9 @@ export const PERSON = {
 export const INTRO =
   'I’m a data science grad student at Stony Brook University. I build computer vision, NLP and edge AI systems: most recently real-time video analytics and alerting at Aivid Tech Vision, and a local-first focus tracker on a Snapdragon NPU for the Qualcomm Hackathon.';
 
+// What I'm looking for (stated by Rushi, 2026-10-17).
+export const LOOKING_FOR = 'Looking for full-time or internship roles from May 2027.';
+
 export const LINKS = {
   github: 'https://github.com/Rushi0070',
   githubUser: 'Rushi0070',

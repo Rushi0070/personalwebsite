@@ -557,6 +557,35 @@ mark.hit {
   font-size: 16.5px;
   line-height: 1.7;
 }
+.avail,
+.contact-avail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 20px;
+  color: var(--ok);
+  font: 13.5px/1.5 var(--mono-family);
+}
+.avail i,
+.contact-avail i {
+  width: 7px;
+  height: 7px;
+  background: currentColor;
+  animation: blink 1.6s steps(1, end) infinite;
+}
+.avail button {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 4px;
+}
+.avail button:hover {
+  color: var(--train);
+}
+.contact-avail {
+  margin: 0 0 14px;
+}
 .actions {
   display: flex;
   flex-wrap: wrap;

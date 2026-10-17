@@ -208,6 +208,7 @@ function fetchLines(ctx: Ctx): Line[] {
       k: 'fetch',
       head: [{ t: 'rushi', cls: 'p' }, '@', { t: 'run', cls: 'p' }, { t: ' · ms data science, stony brook university', cls: 'b' }],
       rows: [
+        ['status', [{ t: 'full-time or internship · from may 2027', cls: 'okc' }]],
         ['focus', ['computer vision · nlp · edge ai']],
         ['uptime', [n(step.toLocaleString('en-US')), ` days since epoch 0 (${ym(EPOCH0)})`]],
         ['stack', ['pytorch · opencv · onnx · xgboost · docker']],
@@ -437,6 +438,7 @@ const COMMANDS: Record<string, Command> = {
     run: (_, ctx) =>
       ctx.print(
         out(`PING ${PERSON.handle} via email and linkedin`),
+        out({ t: 'status: looking for full-time or internship roles from may 2027', cls: 'okc' }),
         out('64 bytes from ', { t: PERSON.email, cls: 'b' }, ': icmp_seq=1 ttl=64 · reachable'),
         dim('send a real one: ', cmd('mail hello'), ' · ', cmd('open linkedin')),
       ),
