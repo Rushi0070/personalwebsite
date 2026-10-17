@@ -763,22 +763,74 @@ mark.hit {
   color: var(--dim);
   font-size: 12px;
 }
+.d-fig-btn {
+  position: relative;
+  display: block;
+  width: 100%;
+  cursor: zoom-in;
+}
 .d-fig img {
   display: block;
   width: 100%;
-  max-height: 170px;
+  height: auto;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
   border: 1px solid var(--line);
-  filter: grayscale(1) contrast(1.04) brightness(0.92);
-  transition: filter var(--slow) var(--ease);
+  transition: border-color var(--fast) var(--ease);
 }
-.d-fig:hover img {
-  filter: none;
+.d-fig-btn:hover img {
+  border-color: var(--chrome);
+}
+.d-fig-zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--ink);
+  font: 12px/1.5 var(--mono-family);
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+}
+.d-fig-btn:hover .d-fig-zoom,
+.d-fig-btn:focus-visible .d-fig-zoom {
+  opacity: 1;
 }
 .d-fig figcaption {
   margin-top: 6px;
   color: var(--dim);
   font: 12px var(--mono-family);
+}
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  cursor: zoom-out;
+  animation: fade var(--slow) var(--ease);
+}
+.lightbox img {
+  max-width: min(100%, 1024px);
+  max-height: calc(100svh - 110px);
+  border: 1px solid var(--line);
+}
+.lightbox p {
+  color: var(--chrome);
+  font: 12.5px var(--mono-family);
+}
+.lightbox p span {
+  color: var(--dim);
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
 }
 .d-config {
   display: grid;

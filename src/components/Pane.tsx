@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CONFIG, EPOCH0, INTRO, LINKS, PERSON, RUN_END } from '../data';
 import type { Checkpoint } from '../data';
@@ -143,6 +144,13 @@ function About({ run, now, gh, theme, reduceMotion, trainKey, hl }: Props) {
 }
 
 function Detail({ c, hl, run }: { c: Checkpoint; hl: string; run: (cmd: string) => void }) {
+  const [zoom, setZoom] = useState(false);
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setZoom(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoom]);
   return (
     <article className="detail" aria-labelledby={`${c.id}-t`}>
       <header className="d-head">
@@ -174,6 +182,15 @@ function Detail({ c, hl, run }: { c: Checkpoint; hl: string; run: (cmd: string) 
           ))}
         </ul>
         <aside className="d-side">
+          {c.photo && (
+            <figure className="d-fig">
+              <button type="button" className="d-fig-btn" onClick={() => setZoom(true)} aria-label="View the photo larger">
+                <img src={c.photo.src} alt={c.photo.alt} loading="lazy" />
+                <span className="d-fig-zoom" aria-hidden="true">view large ↗</span>
+              </button>
+              <figcaption>{c.photo.caption}</figcaption>
+            </figure>
+          )}
           {c.evals && c.evals.length > 0 && (
             <dl className="metrics">
               {c.evals.map((e) => (
@@ -208,14 +225,16 @@ function Detail({ c, hl, run }: { c: Checkpoint; hl: string; run: (cmd: string) 
               </ul>
             </div>
           )}
-          {c.photo && (
-            <figure className="d-fig">
-              <img src={c.photo.src} alt={c.photo.alt} loading="lazy" />
-              <figcaption>{c.photo.caption}</figcaption>
-            </figure>
-          )}
         </aside>
       </div>
+      {zoom && c.photo && (
+        <div className="lightbox" role="dialog" aria-modal="true" aria-label={c.photo.alt} onClick={() => setZoom(false)}>
+          <img src={c.photo.src} alt={c.photo.alt} />
+          <p>
+            {c.photo.caption} · <span>click or esc to close</span>
+          </p>
+        </div>
+      )}
     </article>
   );
 }

@@ -91,13 +91,6 @@ export const CHECKPOINTS: Checkpoint[] = [
     url: 'https://github.com/Rushi0070/VitalSync',
     urlLabel: 'github',
     stack: ['Python', 'ONNX Runtime', 'QNN', 'YOLO11n', 'Ollama', 'qwen3-vl', 'OpenCV', 'TypeScript'],
-    config: [
-      { key: 'providers', value: 'QNN → DirectML → CPU' },
-      { key: 'conf_thresh', value: '0.4' },
-      { key: 'nms_iou', value: '0.45' },
-      { key: 'infer_every', value: '3rd frame' },
-      { key: 'screenshot', value: '768px JPEG' },
-    ],
     lines: [
       'Prototyped a local-first focus and hydration tracker pairing YOLO11n with the qwen3-vl vision-language model; all webcam frames and screenshots stay on-device.',
       'Configured ONNX Runtime with a QNNExecutionProvider → DirectML → CPU provider chain so detection targets the Snapdragon NPU where available and falls back gracefully.',
