@@ -14,15 +14,15 @@ interface Props {
 
 // Plot box inside the canvas. The top band holds the checkpoint flags, so
 // labels never sit on the curve.
-const PAD = { l: 34, r: 16, t: 40, b: 22 };
+const PAD = { l: 30, r: 12, t: 36, b: 22 };
 const LANE = 12; // y of the flag row
 const Y_MAX = 1.1;
 const EASE = (x: number) => 1 - Math.pow(1 - x, 5); // easeOutQuint
 
-// Dated checkpoints in time order, with their list numbers.
-const DATED = CHECKPOINTS.map((c, i) => ({ c, n: String(i + 1).padStart(2, '0') }))
-  .filter((d) => d.c.at)
-  .sort((a, b) => a.c.at!.getTime() - b.c.at!.getTime());
+// Dated checkpoints, in time order.
+const DATED = CHECKPOINTS.filter((c) => c.at)
+  .sort((a, b) => a.at!.getTime() - b.at!.getTime())
+  .map((c) => ({ c }));
 
 const fmtMonth = (t: number) => {
   const d = new Date(t);
@@ -198,16 +198,16 @@ export default function LossChart({ activeId, onSelect, smoothing, theme, now, r
       ctx.lineWidth = 1;
     }
 
-    // checkpoint flags: a numbered cell in the top lane, a hairline down to
-    // the run, a square on the curve. The active one spells its id, inverted.
+    // checkpoint flags: a labelled cell in the top lane, a hairline down to
+    // the run, a square on the curve. The active one is inverted.
     // Flags that would overlap are pushed right, keeping time order.
     ctx.font = body;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     let edge = -Infinity;
-    const flags = DATED.map(({ c, n }) => {
+    const flags = DATED.map(({ c }) => {
       const on = c.id === activeId;
-      const label = on ? `${n} ${c.id}` : n;
+      const label = c.id;
       const w = Math.ceil(ctx.measureText(label).width) + 8;
       const x = X(c.at!.getTime());
       const left = Math.max(Math.round(x - 4), edge + 3);

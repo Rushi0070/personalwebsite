@@ -17,6 +17,8 @@ export interface TerminalHandle {
 interface Props {
   themes: string[];
   step: number;
+  /** The boot starts the first time this is true (the panel is on screen). */
+  start: boolean;
   onSelect: (id: string) => void;
   onTheme: (name?: string) => string;
   onSmoothing: (v: number) => void;
@@ -85,7 +87,7 @@ function keystrokes(text: string) {
 }
 
 const Terminal = forwardRef<TerminalHandle, Props>(function Terminal(
-  { themes, step, onSelect, onTheme, onSmoothing, reduceMotion },
+  { themes, step, start, onSelect, onTheme, onSmoothing, reduceMotion },
   ref,
 ) {
   const [lines, setLines] = useState<Line[]>([]);
@@ -100,6 +102,7 @@ const Terminal = forwardRef<TerminalHandle, Props>(function Terminal(
   // Type the boot command like a person (uneven keys, one slip that gets
   // backspaced), then stream the log.
   useEffect(() => {
+    if (!start) return;
     const BOOT = boot(step);
     if (reduceMotion) {
       setLines([{ k: 'cmd', text: BOOT_CMD }, ...BOOT]);
@@ -133,7 +136,7 @@ const Terminal = forwardRef<TerminalHandle, Props>(function Terminal(
     return () => window.clearTimeout(timer);
     // The boot runs once; a later step tick must not replay it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reduceMotion]);
+  }, [start, reduceMotion]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -179,7 +182,7 @@ const Terminal = forwardRef<TerminalHandle, Props>(function Terminal(
           break;
         }
         onSelect(c.id);
-        print({ k: 'ok', text: `loaded ckpts/${c.id}` }, { k: 'dim', text: `${c.title.toLowerCase()} · ${c.role.toLowerCase()}` });
+        print({ k: 'ok', text: `→ #${c.id}` }, { k: 'dim', text: `${c.title.toLowerCase()} · ${c.role.toLowerCase()}` });
         break;
       }
       case 'eval': {

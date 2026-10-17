@@ -1,21 +1,39 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
-import { CHECKPOINTS, CONFIG, EPOCH0, LINKS, PERSON, RUN_END } from './data';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
+import { CHECKPOINTS, CONFIG, EPOCH0, INTRO, LINKS, PERSON, RUN_END } from './data';
+import type { Kind } from './data';
 import { daysBetween } from './run';
 import LossChart from './components/LossChart';
 import Terminal from './components/Terminal';
-import Buffer from './components/Buffer';
+import Entry from './components/Entry';
 import type { TerminalHandle } from './components/Terminal';
 
-// rushi-jhala / training run.
-// The page is an experiment dashboard: the career is the run, each role and
-// project is a checkpoint, the CV's numbers are the evals, the stack is the
-// config. Desktop is one fixed stage; small screens fold into a column.
+// rushi-jhala / training run, reading edition.
+// One scrolling page: the content is the point, set at reading size; the run
+// (loss curve, terminal, status line) is the frame around it. A sticky index
+// on the left always shows where you are.
 
 const THEMES = ['graphite', 'paper', 'phosphor'] as const;
-// Must match the stage breakpoint in index.css.
-const DESKTOP = '(min-width: 1180px) and (min-height: 700px)';
 type Theme = (typeof THEMES)[number];
+
+interface Section {
+  id: string;
+  label: string;
+  kind?: Kind;
+}
+
+const SECTIONS: Section[] = [
+  { id: 'about', label: 'about' },
+  { id: 'experience', label: 'experience', kind: 'experience' },
+  { id: 'projects', label: 'projects', kind: 'project' },
+  { id: 'education', label: 'education', kind: 'education' },
+  { id: 'leadership', label: 'leadership', kind: 'leadership' },
+  { id: 'skills', label: 'skills' },
+  { id: 'terminal', label: 'terminal' },
+  { id: 'contact', label: 'contact' },
+];
+
+const entriesOf = (kind?: Kind) => (kind ? CHECKPOINTS.filter((c) => c.kind === kind) : []);
 
 const store = {
   get(k: string) {
@@ -109,15 +127,61 @@ function useGithub(user: string) {
   return gh;
 }
 
-function idFromHash() {
-  const id = decodeURIComponent(window.location.hash.slice(1));
-  return CHECKPOINTS.some((c) => c.id === id) ? id : null;
+// Which section (and which entry inside it) the reader is on: the last one
+// whose top has passed 30% of the viewport; the last section once the page
+// bottoms out.
+function useScrollSpy() {
+  const [spot, setSpot] = useState({ section: SECTIONS[0].id, entry: '' });
+  useEffect(() => {
+    // ~15 rects per scroll event: cheap enough to measure directly.
+    const measure = () => {
+      const line = window.innerHeight * 0.3;
+      let section = SECTIONS[0].id;
+      let entry = '';
+      for (const el of document.querySelectorAll<HTMLElement>('[data-spy]')) {
+        if (el.getBoundingClientRect().top > line) break;
+        if (el.dataset.spy === 'section') {
+          section = el.id;
+          entry = '';
+        } else {
+          entry = el.id;
+        }
+      }
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      if (atBottom) {
+        section = SECTIONS[SECTIONS.length - 1].id;
+        entry = '';
+      }
+      setSpot((s) => (s.section === section && s.entry === entry ? s : { section, entry }));
+    };
+    measure();
+    window.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+  return spot;
+}
+
+// True once the element has been on screen (and stays true).
+function useSeen<T extends Element>() {
+  const ref = useRef<T>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || seen) return;
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setSeen(true), { threshold: 0.25 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [seen]);
+  return [ref, seen] as const;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const fmtTime = (d: Date) =>
   d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).toLowerCase();
-const fmtDate = (d: Date) => `${d.getFullYear()}.${pad2(d.getMonth() + 1)}`;
 
 function monthsUntil(from: Date, to: Date) {
   return Math.max(0, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()));
@@ -145,18 +209,6 @@ function Mark() {
   );
 }
 
-function Panel({ title, meta, className, children, id }: { title: ReactNode; meta?: ReactNode; className?: string; children: ReactNode; id?: string }) {
-  return (
-    <section className={`panel ${className ?? ''}`} aria-label={typeof title === 'string' ? title : undefined} id={id}>
-      <header className="panel-head">
-        <span className="panel-title">{title}</span>
-        {meta && <span className="panel-meta">{meta}</span>}
-      </header>
-      <div className="panel-body">{children}</div>
-    </section>
-  );
-}
-
 function Ext({ href, children, className }: { href: string; children: ReactNode; className?: string }) {
   const internal = href.startsWith('/') || href.startsWith('mailto');
   return (
@@ -166,14 +218,24 @@ function Ext({ href, children, className }: { href: string; children: ReactNode;
   );
 }
 
+function SectionHead({ id, label }: { id: string; label: string }) {
+  return (
+    <h2 className="sec-h" id={`${id}-h`}>
+      <span className="sec-n">{pad2(SECTIONS.findIndex((s) => s.id === id))}</span>
+      <span>{label}</span>
+    </h2>
+  );
+}
+
 // --- page ---------------------------------------------------------------------
 
 export default function App() {
   const reduceMotion = usePrefersReducedMotion();
   const now = useNow();
   const gh = useGithub(LINKS.githubUser);
+  const spot = useScrollSpy();
   const term = useRef<TerminalHandle>(null);
-  const listRef = useRef<HTMLOListElement>(null);
+  const [termRef, termSeen] = useSeen<HTMLDivElement>();
 
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = store.get('theme') as Theme | null;
@@ -181,26 +243,7 @@ export default function App() {
     applyTheme(t);
     return t;
   });
-  // The open checkpoint lives in the hash (#vitalsync), so each one has a link.
-  const [activeId, setActiveId] = useState(() => idFromHash() ?? CHECKPOINTS[0].id);
   const [smoothing, setSmoothing] = useState(0.8);
-
-  const firstSelect = useRef(true);
-  useEffect(() => {
-    if (firstSelect.current) {
-      firstSelect.current = false;
-      return;
-    }
-    history.replaceState(null, '', `#${activeId}`);
-  }, [activeId]);
-  useEffect(() => {
-    const on = () => {
-      const id = idFromHash();
-      if (id) setActiveId(id);
-    };
-    window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
-  }, []);
 
   const cycleTheme = useCallback((name?: string) => {
     let next: Theme;
@@ -211,234 +254,238 @@ export default function App() {
     return next;
   }, [theme]);
 
-  const active = CHECKPOINTS.find((c) => c.id === activeId) ?? CHECKPOINTS[0];
-  const activeIndex = CHECKPOINTS.indexOf(active);
+  const go = useCallback(
+    (id: string) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      history.replaceState(null, '', `#${id}`);
+    },
+    [reduceMotion],
+  );
 
-  const select = useCallback((id: string) => setActiveId(id), []);
+  // On small screens the index is a sideways strip: keep the current
+  // section's tab in view.
+  useEffect(() => {
+    const a = document.querySelector<HTMLElement>(`.toc > ol > li > a[href="#${spot.section}"]`);
+    const ol = a?.closest('ol');
+    if (!a || !ol || ol.scrollWidth <= ol.clientWidth) return;
+    const left = a.getBoundingClientRect().left - ol.getBoundingClientRect().left + ol.scrollLeft - 16;
+    ol.scrollTo({ left, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }, [spot.section, reduceMotion]);
 
-  // Keyboard: j/k or arrows walk the checkpoints, / or : opens the terminal,
-  // t cycles the theme. Ignored while typing.
+  // A deep link (#vitalsync) arrives before React has drawn the target.
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (id) document.getElementById(id)?.scrollIntoView({ block: 'start' });
+  }, []);
+
+  // Keyboard: j/k step through sections, / opens the terminal, t cycles the
+  // theme. Ignored while typing or with modifiers.
+  const sectionIndex = Math.max(0, SECTIONS.findIndex((s) => s.id === spot.section));
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'ArrowDown' || e.key === 'j') {
+      if (e.key === 'j') go(SECTIONS[Math.min(SECTIONS.length - 1, sectionIndex + 1)].id);
+      else if (e.key === 'k') go(SECTIONS[Math.max(0, sectionIndex - 1)].id);
+      else if (e.key === '/') {
         e.preventDefault();
-        setActiveId(CHECKPOINTS[Math.min(CHECKPOINTS.length - 1, activeIndex + 1)].id);
-      } else if (e.key === 'ArrowUp' || e.key === 'k') {
-        e.preventDefault();
-        setActiveId(CHECKPOINTS[Math.max(0, activeIndex - 1)].id);
-      } else if (e.key === '/' || e.key === ':') {
-        e.preventDefault();
+        go('terminal');
         term.current?.focus();
-      } else if (e.key === 't') {
-        cycleTheme();
-      }
+      } else if (e.key === 't') cycleTheme();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIndex, cycleTheme]);
-
-  // Keep the active row in view inside the list.
-  useEffect(() => {
-    const row = listRef.current?.querySelector<HTMLElement>('[aria-current="true"]');
-    row?.scrollIntoView({ block: 'nearest' });
-  }, [activeId]);
+  }, [sectionIndex, go, cycleTheme]);
 
   const step = daysBetween(EPOCH0, now);
   const etaMonths = monthsUntil(now, RUN_END);
-  const allEvals = useMemo(() => CHECKPOINTS.flatMap((c) => (c.evals ?? []).map((e) => ({ ...e, id: c.id }))), []);
+  const where = spot.entry || spot.section;
+  const link = (id: string) => (e: MouseEvent) => {
+    e.preventDefault();
+    go(id);
+  };
 
   return (
-    <div className="stage">
-      <a href="#ckpt" className="skip">skip to the checkpoint</a>
-
-      {/* ---- top frame ---- */}
-      <header className="top">
-        <div className="who">
-          <a className="brand" href="/" aria-label={`${PERSON.name}, home`}>
+    <>
+      <a href="#experience" className="skip">skip to experience</a>
+      <div className="page">
+        {/* ---- the index ---- */}
+        <aside className="side">
+          <a className="brand" href="#about" onClick={link('about')}>
             <Mark />
-            <span>{PERSON.name.toLowerCase()}</span>
+            <span>{PERSON.handle}</span>
           </a>
-          <h1 className="tagline">
-            <span className="sr-only">{PERSON.name}: </span>
-            ms data science, stony brook <span className="dot">·</span> computer vision <span className="dot">·</span> nlp <span className="dot">·</span> edge ai
-          </h1>
-        </div>
-        <nav className="links" aria-label="Elsewhere">
-          <Ext href={LINKS.github}>github</Ext>
-          <Ext href={LINKS.linkedin}>linkedin</Ext>
-          <Ext href={LINKS.blog}>blog</Ext>
-          <Ext href={LINKS.email}>email</Ext>
-          <Ext href={LINKS.resume} className="is-key">resume ↓</Ext>
-        </nav>
-      </header>
+          <nav className="toc" aria-label="Sections">
+            <ol>
+              {SECTIONS.map((s, i) => {
+                const entries = entriesOf(s.kind);
+                const on = spot.section === s.id;
+                return (
+                  <li key={s.id} className={on ? 'is-on' : ''}>
+                    <a href={`#${s.id}`} aria-current={on ? 'location' : undefined} onClick={link(s.id)}>
+                      <span className="toc-n">{pad2(i)}</span>
+                      {s.label}
+                    </a>
+                    {entries.length > 1 && (
+                      <ol className="toc-sub">
+                        {entries.map((c) => (
+                          <li key={c.id}>
+                            <a href={`#${c.id}`} aria-current={spot.entry === c.id ? 'location' : undefined} onClick={link(c.id)}>
+                              {c.id}
+                            </a>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+          <div className="side-foot">
+            <Ext href={LINKS.resume} className="key">resume ↓</Ext>
+            <button type="button" className="theme-btn" onClick={() => cycleTheme()} aria-label={`Theme: ${theme}. Change theme`}>
+              theme <span>{theme}</span>
+            </button>
+          </div>
+        </aside>
 
-      {/* ---- left: checkpoints ---- */}
-      <Panel title="checkpoints" meta={`${pad2(activeIndex + 1)}/${pad2(CHECKPOINTS.length)}`} className="p-ckpts">
-        <ol className="ckpts" ref={listRef}>
-          {CHECKPOINTS.map((c, i) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                className="ckpt"
-                aria-current={c.id === activeId ? 'true' : undefined}
-                onClick={() => {
-                  select(c.id);
-                  // In the single-column layout the buffer is further down: bring it up.
-                  if (!window.matchMedia(DESKTOP).matches) {
-                    document.getElementById('ckpt')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
-                  }
-                }}
-              >
-                <span className="ckpt-n">{pad2(i + 1)}</span>
-                <span className="ckpt-id">{c.id}</span>
-                <span className={`ckpt-s s-${c.status}`}>{c.status === 'running' ? 'running' : 'done'}</span>
-                <span className="ckpt-k">
-                  {c.kind}
-                  {c.at && <span className="ckpt-at">{fmtDate(c.at)}</span>}
+        <main className="main">
+          {/* ---- about ---- */}
+          <section id="about" data-spy="section" className="hero" aria-label="About">
+            <p className="eyebrow">
+              <i className="live" aria-hidden="true" /> training · ~/runs/{PERSON.handle}
+            </p>
+            <h1>{PERSON.name}</h1>
+            <p className="lede">
+              MS Data Science, Stony Brook University
+              <span className="lede-focus"> · computer vision · nlp · edge ai</span>
+            </p>
+            <p className="intro">{INTRO}</p>
+            <p className="cta">
+              <Ext href={LINKS.resume} className="key">resume ↓</Ext>
+              <Ext href={LINKS.email}>email</Ext>
+              <Ext href={LINKS.github}>github</Ext>
+              <Ext href={LINKS.linkedin}>linkedin</Ext>
+              <Ext href={LINKS.blog}>blog</Ext>
+            </p>
+
+            <figure className="run">
+              <figcaption className="run-head">
+                <span className="run-title">
+                  <span className="dimmed">runs/{PERSON.handle}/</span>train/loss
                 </span>
-                <span className="ckpt-r">{c.role.toLowerCase()}</span>
-              </button>
-            </li>
-          ))}
-        </ol>
-      </Panel>
+                <span className="run-meta">illustrative · click a checkpoint</span>
+              </figcaption>
+              <LossChart activeId={spot.entry} onSelect={go} smoothing={smoothing} theme={theme} now={now} reduceMotion={reduceMotion} />
+              <dl className="run-stats">
+                <div><dt>step</dt><dd>{step.toLocaleString('en-US')}</dd></div>
+                <div><dt>eta</dt><dd>{etaMonths} mo</dd></div>
+                <div><dt>local</dt><dd>{fmtTime(now)} et</dd></div>
+                <div>
+                  <dt>last push</dt>
+                  <dd>
+                    {gh && gh.pushedAt ? (
+                      <Ext href={`${LINKS.github}/${gh.pushedRepo}`}>
+                        {ago(gh.pushedAt, now)} · {gh.pushedRepo}
+                      </Ext>
+                    ) : (
+                      '—'
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </figure>
+          </section>
 
-      {/* ---- centre top: the run ---- */}
-      <Panel
-        title={<><span className="dimmed">runs/{PERSON.handle}/</span>train/loss</>}
-        className="p-chart"
-        meta={
-          <span className="chart-tools">
-            <span className="legend">
-              <i className="sw sw-raw" /> raw <i className="sw sw-smooth" /> smoothed <i className="sw sw-fc" /> forecast
-            </span>
-            <label className="smoothing">
-              <span>smoothing</span>
-              <input
-                type="range"
-                min={0}
-                max={0.99}
-                step={0.01}
-                value={smoothing}
-                onChange={(e) => setSmoothing(Number(e.target.value))}
-                aria-label="Chart smoothing"
+          {/* ---- the checkpoints, by kind ---- */}
+          {SECTIONS.filter((s) => s.kind).map((s) => (
+            <section key={s.id} id={s.id} data-spy="section" className="sec" aria-labelledby={`${s.id}-h`}>
+              <SectionHead id={s.id} label={s.label} />
+              {entriesOf(s.kind).map((c) => (
+                <Entry key={c.id} c={c} />
+              ))}
+            </section>
+          ))}
+
+          {/* ---- skills ---- */}
+          <section id="skills" data-spy="section" className="sec" aria-labelledby="skills-h">
+            <SectionHead id="skills" label="skills" />
+            <dl className="skills">
+              {CONFIG.map((c) => (
+                <div key={c.key}>
+                  <dt>{c.key.replace('_', ' ')}</dt>
+                  <dd>
+                    <ul className="tags">
+                      {c.value.map((v) => (
+                        <li key={v}>{v}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          {/* ---- terminal ---- */}
+          <section id="terminal" data-spy="section" className="sec" aria-labelledby="terminal-h">
+            <SectionHead id="terminal" label="terminal" />
+            <p className="sec-note">
+              A small shell for this page. Try <code>help</code>, <code>ls</code>, <code>cat vitalsync</code> or{' '}
+              <code>theme paper</code>.
+            </p>
+            <div className="term-box" ref={termRef}>
+              <span className="term-label">zsh</span>
+              <Terminal
+                ref={term}
+                themes={[...THEMES]}
+                step={step}
+                start={termSeen}
+                onSelect={go}
+                onTheme={cycleTheme}
+                onSmoothing={setSmoothing}
+                reduceMotion={reduceMotion}
               />
-              <output>{smoothing.toFixed(2)}</output>
-            </label>
-          </span>
-        }
-      >
-        <LossChart activeId={activeId} onSelect={select} smoothing={smoothing} theme={theme} now={now} reduceMotion={reduceMotion} />
-        <p className="chart-note">illustrative curve · x is real time · checkpoints sit where the cv dates them</p>
-      </Panel>
-
-      {/* ---- centre bottom left: the checkpoint buffer ---- */}
-      <Panel
-        title={`ckpts/${active.id}.md`}
-        className="p-ckpt"
-        id="ckpt"
-        meta={<span className={`badge b-${active.status}`}>{active.status}</span>}
-      >
-        <Buffer ckpt={active} />
-      </Panel>
-
-      {/* ---- centre bottom right: terminal ---- */}
-      <Panel title="terminal" className="p-term" meta="zsh">
-        <Terminal
-          ref={term}
-          themes={[...THEMES]}
-          step={step}
-          onSelect={select}
-          onTheme={cycleTheme}
-          onSmoothing={setSmoothing}
-          reduceMotion={reduceMotion}
-        />
-      </Panel>
-
-      {/* ---- right: config, eval; left bottom: system ---- */}
-      <Panel title="config.yaml" className="p-config">
-        <dl className="yaml">
-          <div>
-            <dt>name:</dt>
-            <dd>{PERSON.name.toLowerCase()}</dd>
-          </div>
-          <div>
-            <dt>focus:</dt>
-            <dd>
-              <span className="y-p">[</span>
-              {PERSON.focus.join(', ')}
-              <span className="y-p">]</span>
-            </dd>
-          </div>
-          {CONFIG.map((c) => (
-            <div key={c.key}>
-              <dt>{c.key}:</dt>
-              <dd>
-                <span className="y-p">[</span>
-                {c.value.map((v, i) => (
-                  <span key={v}>
-                    {v.toLowerCase()}
-                    {i < c.value.length - 1 && <span className="y-p">, </span>}
-                  </span>
-                ))}
-                <span className="y-p">]</span>
-              </dd>
             </div>
-          ))}
-        </dl>
-      </Panel>
+          </section>
 
-      <Panel title="eval" className="p-eval" meta={`${allEvals.length} metrics`}>
-        <dl className="evals">
-          {allEvals.map((e) => (
-            <div key={`${e.id}-${e.key}`} className={e.id === activeId ? 'is-on' : ''}>
-              <dt>
-                <span className="ev-id">{e.id}/</span>
-                {e.key}
-              </dt>
-              <dd>
-                {e.gauge !== undefined && (
-                  <span className="gauge" style={{ '--g': e.gauge } as CSSProperties} aria-hidden="true" />
-                )}
-                <span className="num">{e.value}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </Panel>
-
-      <Panel title="system" className="p-system">
-        <dl className="sys">
-          <div><dt>step</dt><dd>{step.toLocaleString('en-US')}</dd></div>
-          <div><dt>eta</dt><dd>{etaMonths} mo</dd></div>
-          <div><dt>local</dt><dd>{fmtTime(now)} et</dd></div>
-          <div><dt>repos</dt><dd>{gh ? gh.repos : '—'}</dd></div>
-          <div>
-            <dt>last push</dt>
-            <dd>{gh && gh.pushedAt ? ago(gh.pushedAt, now) : '—'}</dd>
-          </div>
-        </dl>
-        {gh?.pushedRepo && (
-          <p className="pushed">
-            <Ext href={`${LINKS.github}/${gh.pushedRepo}`}>{gh.pushedRepo} ↗</Ext>
-          </p>
-        )}
-      </Panel>
+          {/* ---- contact ---- */}
+          <section id="contact" data-spy="section" className="sec contact" aria-labelledby="contact-h">
+            <SectionHead id="contact" label="contact" />
+            <p className="contact-line">Email is the quickest way to reach me.</p>
+            <p className="contact-mail">
+              <Ext href={LINKS.email}>{PERSON.email}</Ext>
+            </p>
+            <p className="cta">
+              <Ext href={LINKS.resume} className="key">resume ↓</Ext>
+              <Ext href={LINKS.github}>github</Ext>
+              <Ext href={LINKS.linkedin}>linkedin</Ext>
+              <Ext href={LINKS.x}>x</Ext>
+              <Ext href={LINKS.blog}>blog</Ext>
+            </p>
+            <p className="colophon">
+              set in jetbrains mono and ibm plex sans · {PERSON.location.toLowerCase()} · eta{' '}
+              {RUN_END.toLocaleString('en-US', { month: 'short', year: 'numeric' }).toLowerCase()}
+            </p>
+          </section>
+        </main>
+      </div>
 
       {/* ---- status line ---- */}
-      <footer className="status" aria-label="Status">
+      <footer className="status" aria-hidden="true">
         <span className="mode">TRAINING</span>
-        <span className="st-path">~/runs/{PERSON.handle}/ckpts/{active.id}.md</span>
-        <span className="st-item">{theme}</span>
-        <span className="st-item">smooth {smoothing.toFixed(2)}</span>
-        <span className="st-keys" aria-hidden="true">
-          <kbd>j</kbd><kbd>k</kbd> select <kbd>/</kbd> terminal <kbd>t</kbd> theme
+        <span className="st-path">~/runs/{PERSON.handle}/{where}.md</span>
+        <span className="st-keys">
+          <kbd>j</kbd><kbd>k</kbd> section <kbd>/</kbd> terminal <kbd>t</kbd> theme
         </span>
-        <span className="st-pos">{pad2(activeIndex + 1)}/{pad2(CHECKPOINTS.length)}</span>
+        <span className="st-item">{theme}</span>
+        <span className="st-pos">
+          {pad2(sectionIndex)}/{pad2(SECTIONS.length - 1)}
+        </span>
       </footer>
-    </div>
+    </>
   );
 }

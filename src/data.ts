@@ -11,6 +11,10 @@ export const PERSON = {
   email: 'jhalarushi@gmail.com',
 };
 
+// One paragraph for the top of the page, made only of facts from the CV.
+export const INTRO =
+  'I’m a data science grad student at Stony Brook University. I build computer vision, NLP and edge AI systems: most recently real-time video analytics and alerting at Aivid Tech Vision, and a local-first focus tracker on a Snapdragon NPU for the Qualcomm Hackathon.';
+
 export const LINKS = {
   github: 'https://github.com/Rushi0070',
   githubUser: 'Rushi0070',
