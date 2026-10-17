@@ -301,6 +301,13 @@ export default function App() {
                   <span className="ix-n">{pad2(i)}</span>
                   <span className="ix-name">{s.file}</span>
                   {list.length > 1 && <span className="ix-count">{list.length}</span>}
+                  {s.id === 'after-hours' && player.playing && (
+                    <span className="eq ix-eq" aria-label="music playing">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  )}
                 </button>
                 {list.length > 1 && (
                   <ol className="ix-sub">

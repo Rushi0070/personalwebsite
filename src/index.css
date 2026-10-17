@@ -1359,6 +1359,11 @@ mark.hit {
 .trk-n .eq {
   color: var(--train);
 }
+.ix-eq {
+  margin-left: auto;
+  align-self: center;
+  color: var(--ok);
+}
 
 /* the terminal bar's now playing */
 .term-np {

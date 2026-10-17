@@ -144,7 +144,7 @@ const entryLabel = (id: string) => CHECKPOINTS.find((c) => c.id === id)?.title ?
 interface Command {
   usage: string;
   help: string;
-  group: 'navigate' | 'find' | 'reach' | 'offline' | 'this';
+  group: 'navigate' | 'find' | 'reach' | 'music' | 'this';
   run: (args: string[], ctx: Ctx) => void;
   hidden?: boolean;
 }
@@ -224,7 +224,7 @@ function fetchLines(ctx: Ctx): Line[] {
         ['stack', ['pytorch · opencv · onnx · xgboost · docker']],
         ['eta', ['may 2027 · ', n(monthsLeft(ctx.now)), ' months to go']],
         ['langs', ['python · java · sql']],
-        ['offline', ['dj · ', cmd(`${PLAYLIST_SIZE} tracks on rotation`, 'playlist')]],
+        ['music', ['dj, part-time at stony brook · ', cmd(`${PLAYLIST_SIZE} on rotation`, 'playlist')]],
         [
           'github',
           ctx.gh ? [n(ctx.gh.repos), ' repos', ...(ctx.gh.pushedAt ? [` · pushed ${ago(ctx.gh.pushedAt, ctx.now)}`] : [])] : ['—'],
@@ -264,7 +264,7 @@ const COMMANDS: Record<string, Command> = {
         ['navigate', [cmd('ls'), ' · ', cmd('cd <dir>', 'cd projects'), ' · ', cmd('open <name>', 'open vitalsync'), ' · ', cmd('tree'), ' · ', cmd('back')]],
         ['find', [cmd('grep <word>', 'grep onnx'), ' · ', cmd('which <skill>', 'which pytorch'), ' · ', cmd('log'), ' · ', cmd('eval')]],
         ['reach me', [cmd('mail [message]', 'mail hello'), ' · ', cmd('copy email'), ' · ', cmd('resume'), ' · ', cmd('ping')]],
-        ['offline', [cmd('cd offline'), ' · ', cmd('playlist'), ' · ', cmd('play [song]', 'play delilah'), ' · ', cmd('next'), ' · ', cmd('pause'), ' · ', cmd('np')]],
+        ['after hours', [cmd('cd after-hours'), ' · ', cmd('playlist'), ' · ', cmd('play [song]', 'play delilah'), ' · ', cmd('next'), ' · ', cmd('pause'), ' · ', cmd('np')]],
         ['this site', [cmd('fetch'), ' · ', cmd('theme [name]', 'theme'), ' · ', cmd('history'), ' · ', cmd('clear'), ' · ', cmd('man <cmd>', 'man grep')]],
       ];
       ctx.print(...table(groups.map(([g, ps]) => [key(g), ps])), dim('tab completes · ↑↓ history · everything underlined is clickable'));
@@ -469,7 +469,7 @@ const COMMANDS: Record<string, Command> = {
   playlist: {
     usage: 'playlist',
     help: 'what is on rotation (click one to play its preview)',
-    group: 'offline',
+    group: 'music',
     run: (_, ctx) => {
       const p = ctx.player;
       ctx.print(
@@ -486,7 +486,7 @@ const COMMANDS: Record<string, Command> = {
   play: {
     usage: 'play [song|number]',
     help: 'play a preview: play, play delilah, play 3',
-    group: 'offline',
+    group: 'music',
     run: (args, ctx) => {
       const p = ctx.player;
       const arg = args.join(' ').toLowerCase();
@@ -504,7 +504,7 @@ const COMMANDS: Record<string, Command> = {
   pause: {
     usage: 'pause',
     help: 'pause the music',
-    group: 'offline',
+    group: 'music',
     run: (_, ctx) => {
       if (!ctx.player.playing) return ctx.print(dim('nothing is playing · try '), out(cmd('play')));
       ctx.player.pause();
@@ -514,7 +514,7 @@ const COMMANDS: Record<string, Command> = {
   next: {
     usage: 'next',
     help: 'the next track',
-    group: 'offline',
+    group: 'music',
     run: (_, ctx) => {
       const p = ctx.player;
       const i = (p.index + 1) % p.tracks.length;
@@ -525,7 +525,7 @@ const COMMANDS: Record<string, Command> = {
   prev: {
     usage: 'prev',
     help: 'the previous track (or the start of this one)',
-    group: 'offline',
+    group: 'music',
     run: (_, ctx) => {
       const p = ctx.player;
       const restart = p.time > 3 && p.index >= 0;
@@ -537,7 +537,7 @@ const COMMANDS: Record<string, Command> = {
   np: {
     usage: 'np',
     help: 'now playing',
-    group: 'offline',
+    group: 'music',
     run: (_, ctx) => {
       const p = ctx.player;
       if (!p.track) return ctx.print(dim('nothing yet · try '), out(cmd('play delilah')));
@@ -655,8 +655,8 @@ const ALIAS: Record<string, string> = {
   queue: 'playlist',
   skip: 'next',
   stop: 'pause',
-  dj: 'cd offline',
-  offline: 'cd offline',
+  dj: 'cd after-hours',
+  offline: 'cd after-hours',
 };
 
 export const COMMAND_NAMES = Object.keys(COMMANDS).filter((c) => !COMMANDS[c].hidden);
@@ -735,7 +735,7 @@ export function suggest(input: string, ctx: Ctx): string {
 // ---- suggestions by place -----------------------------------------------------------------
 
 export function chipsFor(route: Route, playing = false): string[] {
-  if (route.section === 'offline') return playing ? ['pause', 'next', 'np', 'playlist'] : ['play delilah', 'playlist', 'play', 'cd projects'];
+  if (route.section === 'after-hours') return playing ? ['pause', 'next', 'np', 'playlist'] : ['play delilah', 'playlist', 'play', 'cd projects'];
   const base = chipsOn(route);
   return playing ? [...base.slice(0, 4), 'pause'] : base;
 }

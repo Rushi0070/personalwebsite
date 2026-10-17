@@ -18,7 +18,7 @@ export const SECTIONS: Section[] = [
   { id: 'education', file: 'education/', kind: 'education' },
   { id: 'leadership', file: 'leadership/', kind: 'leadership' },
   { id: 'skills', file: 'skills.yaml' },
-  { id: 'offline', file: 'offline.md' },
+  { id: 'after-hours', file: 'after-hours.md' },
   { id: 'contact', file: 'contact.md' },
 ];
 
@@ -55,8 +55,12 @@ export const shownEntry = (r: Route): Checkpoint | null => {
   return list.length === 1 ? list[0] : null;
 };
 
+// Names a section used to have, or that people might type for it.
+const RENAMED: Record<string, string> = { offline: 'after-hours', dj: 'after-hours' };
+
 export function parseHash(hash: string): Route {
-  const [section, entry] = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
+  const [raw, entry] = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
+  const section = RENAMED[raw] ?? raw;
   if (!SECTIONS.some((s) => s.id === section)) return HOME;
   if (entry && entriesIn(section).some((c) => c.id === entry)) return { section, entry };
   return { section };
@@ -111,7 +115,7 @@ export function resolve(cur: Route, arg: string): Route | null {
       r = { section: r.section, entry: inHere.id };
       continue;
     }
-    const sec = pick(SECTIONS, (s) => s.id, seg);
+    const sec = pick(SECTIONS, (s) => s.id, RENAMED[seg] ?? seg);
     if (sec) {
       r = { section: sec.id };
       continue;

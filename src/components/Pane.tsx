@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CONFIG, EPOCH0, INTRO, LINKS, LOOKING_FOR, OFFLINE, PERSON, PLAYLIST, RUN_END, artAt, spotifyOf } from '../data';
+import { AFTER_HOURS, CONFIG, EPOCH0, INTRO, LINKS, LOOKING_FOR, PERSON, PLAYLIST, RUN_END, artAt, spotifyOf } from '../data';
 import type { Checkpoint } from '../data';
 import { SECTIONS, entriesIn, fileOf, shownEntry } from '../routes';
 import type { Route } from '../routes';
@@ -353,18 +353,18 @@ function Eq() {
   );
 }
 
-function Offline({ player, run, hl }: { player: Player; run: (cmd: string) => void; hl: string }) {
+function AfterHours({ player, run, hl }: { player: Player; run: (cmd: string) => void; hl: string }) {
   const [zoom, setZoom] = useState(false);
   const i = player.index < 0 ? 0 : player.index;
   const cur = PLAYLIST[i];
   const loaded = player.index >= 0;
   const pct = loaded ? Math.min(100, (player.time / (player.duration || 30)) * 100) : 0;
-  const ph = OFFLINE.photo;
+  const ph = AFTER_HOURS.photo;
   return (
     <div className="v-offline">
       <header className="off-head">
-        <h2 className="d-title">Offline</h2>
-        <p className="off-line">{mark(OFFLINE.line, hl)}</p>
+        <h2 className="d-title">After hours</h2>
+        <p className="off-line">{mark(AFTER_HOURS.line, hl)}</p>
       </header>
 
       <div className="off-grid">
@@ -506,7 +506,7 @@ export default function Pane(props: Props) {
   else if (entriesIn(route.section).length > 1) view = <Index section={route.section} hl={hl} run={run} />;
   else if (route.section === 'skills') view = <Skills hl={hl} run={run} />;
   else if (route.section === 'contact') view = <Contact run={run} />;
-  else if (route.section === 'offline') view = <Offline player={props.player} run={run} hl={hl} />;
+  else if (route.section === 'after-hours') view = <AfterHours player={props.player} run={run} hl={hl} />;
   else view = <About {...props} />;
   const label = SECTIONS.find((s) => s.id === route.section)?.id ?? 'about';
   return (
