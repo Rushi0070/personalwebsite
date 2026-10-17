@@ -291,6 +291,25 @@ mark.hit {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tag-sep {
+  color: var(--line);
+}
+.tag-avail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ok);
+  transition: color var(--fast) var(--ease);
+}
+.tag-avail i {
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  animation: blink 1.6s steps(1, end) infinite;
+}
+.tag-avail:hover {
+  color: var(--ink);
+}
 .links {
   display: flex;
   align-items: center;
