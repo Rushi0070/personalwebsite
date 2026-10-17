@@ -1,1290 +1,427 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
-import { 
-  ArrowUpRight, 
-  Mail, 
-  Linkedin, 
-  Github,
-  Volume2,
-  VolumeX,
-  Download,
-  MapPin,
-  Calendar,
-  Twitter
-} from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 
-// --- TYPE DEFINITIONS ---
-interface ListItemProps {
-  index: string;
-  title: string;
-  subtitle?: string;
-  description: React.ReactNode;
-  tags: string[];
-  link?: string;
-  playHover: () => void;
-  date?: string;
-  companyUrl?: string;
-}
+// The portfolio is laid out like a post on the blog (sololeveling): one long
+// page in an 850px column, a sticky "on this page" index in the left gutter,
+// margin notes in the right gutter, and a reading-progress bar along the top.
 
-interface StackCategory {
-  title: string;
-  items: string[];
-}
+const BLOG_URL = 'https://sololeveling-phi.vercel.app/';
 
-// ============================================
-//  ANIMATION PRIMITIVES
-//  Applying Josh Comeau's animation principles:
-//  - Signature cubic-bezier(0.41, 0.1, 0.13, 1)
-//  - Asymmetric timing (snappy in, relaxed out)
-//  - Spring physics for motion (transforms only)
-//  - Respect prefers-reduced-motion
-// ============================================
-
-const usePrefersReducedMotion = () => {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReduced(mq.matches);
-    update();
-    mq.addEventListener?.('change', update);
-    return () => mq.removeEventListener?.('change', update);
-  }, []);
-  return reduced;
+const LINKS = {
+  email: 'mailto:jhalarushi@gmail.com',
+  linkedin: 'https://linkedin.com/in/rushi-jhala-855076224',
+  github: 'https://github.com/Rushi0070',
+  x: 'https://x.com/JhalaRushi',
+  resume: '/resume.pdf',
 };
 
-// Split text into per-letter spans that stagger-reveal.
-// Uses letterReveal keyframe — springs in from below with blur settle.
-const SplitText = memo(({
-  text,
-  className = '',
-  delay = 0,
-  stepMs = 35,
-  keyId,
-}: {
-  text: string;
-  className?: string;
-  delay?: number;
-  stepMs?: number;
-  keyId?: string | number;
-}) => {
-  const reduced = usePrefersReducedMotion();
-  if (reduced) {
-    return <span className={className}>{text}</span>;
-  }
-  const words = text.split(' ');
-  let charCounter = 0;
-  return (
-    <span className={className} aria-label={text}>
-      {words.map((word, wi) => (
-        <span key={`${keyId ?? ''}-w-${wi}`} className="inline-block whitespace-nowrap">
-          {[...word].map((ch) => {
-            const idx = charCounter++;
-            return (
-              <span
-                key={`${keyId ?? ''}-c-${idx}`}
-                className="letter-reveal"
-                style={{ animationDelay: `${delay + idx * stepMs}ms` }}
-                aria-hidden="true"
-              >
-                {ch}
-              </span>
-            );
-          })}
-          {wi < words.length - 1 && (
-            <span key={`${keyId ?? ''}-s-${wi}`} className="inline-block">&nbsp;</span>
-          )}
-        </span>
-      ))}
-    </span>
-  );
-});
-SplitText.displayName = 'SplitText';
+// --- Content ------------------------------------------------------------------
 
-// Boop: Josh's signature hover-and-return spring.
-// The icon briefly rotates + scales, then springs back — perfect for playful icons.
-const Boop = memo(({
-  children,
-  className = '',
-  timeoutMs = 600,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  timeoutMs?: number;
-}) => {
-  const [booping, setBooping] = useState(false);
-  const reduced = usePrefersReducedMotion();
-
-  useEffect(() => {
-    if (!booping) return;
-    const t = window.setTimeout(() => setBooping(false), timeoutMs);
-    return () => window.clearTimeout(t);
-  }, [booping, timeoutMs]);
-
-  const handleEnter = useCallback(() => {
-    if (reduced) return;
-    setBooping(true);
-  }, [reduced]);
-
-  return (
-    <span
-      className={`boop-wrap ${booping ? 'booping' : ''} ${className}`}
-      onMouseEnter={handleEnter}
-    >
-      {children}
-    </span>
-  );
-});
-Boop.displayName = 'Boop';
-
-// Magnetic: element drifts toward cursor with a spring settle on leave.
-// Applied to interactive targets — desktop only, skipped on touch/low-power.
-const useMagnetic = <T extends HTMLElement>(
-  strength = 0.35,
-  enabled = true
-) => {
-  const ref = useRef<T>(null);
-  useEffect(() => {
-    if (!enabled) return;
-    const el = ref.current;
-    if (!el) return;
-
-    const move = (e: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dx = (e.clientX - cx) * strength;
-      const dy = (e.clientY - cy) * strength;
-      el.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0)`;
-    };
-    const leave = () => {
-      el.style.transform = 'translate3d(0, 0, 0)';
-    };
-
-    el.addEventListener('mousemove', move);
-    el.addEventListener('mouseleave', leave);
-    return () => {
-      el.removeEventListener('mousemove', move);
-      el.removeEventListener('mouseleave', leave);
-      el.style.transform = '';
-    };
-  }, [strength, enabled]);
-  return ref;
-};
-
-// Magnetic-wrapper component — binds the hook to a <span> that wraps any child.
-const Magnetic = memo(({
-  children,
-  strength = 0.35,
-  enabled = true,
-  className = '',
-}: {
-  children: React.ReactNode;
-  strength?: number;
-  enabled?: boolean;
-  className?: string;
-}) => {
-  const ref = useMagnetic<HTMLSpanElement>(strength, enabled);
-  return (
-    <span ref={ref} className={`magnetic inline-flex ${className}`}>
-      {children}
-    </span>
-  );
-});
-Magnetic.displayName = 'Magnetic';
-
-// Live clock — animated detail next to the location badge.
-// Updates every second, shows EST time (for Long Island, NY).
-const LiveClock = memo(() => {
-  const [time, setTime] = useState(() => formatESTTime(new Date()));
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setTime(formatESTTime(new Date()));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, []);
-  return (
-    <span className="font-mono tabular-nums" aria-live="off">
-      {time}
-    </span>
-  );
-});
-LiveClock.displayName = 'LiveClock';
-
-const formatESTTime = (d: Date) => {
-  try {
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone: 'America/New_York',
-    }).format(d);
-  } catch {
-    return d.toTimeString().slice(0, 5);
-  }
-};
-
-// --- DEVICE DETECTION HOOK ---
-const useDeviceDetect = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  const [isTablet, setIsTablet] = useState(false);
-  const [isLowPower, setIsLowPower] = useState(false);
-
-  useEffect(() => {
-    const checkDevice = () => {
-      const width = window.innerWidth;
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      
-      setIsMobile(width < 768 || (hasTouch && width < 1024));
-      setIsTablet(width >= 768 && width < 1024);
-      
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const hardwareConcurrency = navigator.hardwareConcurrency || 4;
-      const isSlowConnection = (navigator as Navigator & { connection?: { effectiveType?: string } })
-        .connection?.effectiveType === '2g';
-      
-      setIsLowPower(prefersReducedMotion || hardwareConcurrency <= 2 || isSlowConnection);
-    };
-
-    checkDevice();
-    
-    // Debounced resize handler
-    let resizeTimer: number;
-    const handleResize = () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(checkDevice, 150);
-    };
-    
-    window.addEventListener('resize', handleResize, { passive: true });
-    window.addEventListener('orientationchange', checkDevice, { passive: true });
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', checkDevice);
-      clearTimeout(resizeTimer);
-    };
-  }, []);
-
-  return { isMobile, isTablet, isLowPower };
-};
-
-// --- OPTIMIZED AUDIO ENGINE (Mobile-compatible) ---
-const useSound = () => {
-  const [isMuted, setIsMuted] = useState(true);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const bufferRef = useRef<AudioBuffer | null>(null);
-  const isInitializedRef = useRef(false);
-
-  // Create noise buffer for hover sounds
-  const createNoiseBuffer = useCallback((ctx: AudioContext) => {
-    const bufferSize = ctx.sampleRate * 2;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    return buffer;
-  }, []);
-
-  // Play a short confirmation sound (for mobile unlock feedback)
-  const playUnlockSound = useCallback((ctx: AudioContext) => {
-    try {
-      const oscillator = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(800, ctx.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-      
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      
-      oscillator.connect(gain);
-      gain.connect(ctx.destination);
-      
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.15);
-    } catch {
-      // Silently fail
-    }
-  }, []);
-
-  const initAudio = useCallback(async () => {
-    // If already initialized, just resume and unmute
-    if (isInitializedRef.current && audioCtxRef.current) {
-      try {
-        if (audioCtxRef.current.state === 'suspended') {
-          await audioCtxRef.current.resume();
-        }
-        playUnlockSound(audioCtxRef.current);
-        setIsMuted(false);
-      } catch (e) {
-        console.warn('Audio resume failed:', e);
-      }
-      return;
-    }
-
-    try {
-      // Create AudioContext (with webkit prefix for older iOS)
-      const AudioContextClass = window.AudioContext || 
-        (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
-      
-      const ctx = new AudioContextClass();
-      audioCtxRef.current = ctx;
-      
-      // Mobile browsers start AudioContext in suspended state
-      // Must resume within user gesture handler
-      if (ctx.state === 'suspended') {
-        await ctx.resume();
-      }
-      
-      // Create the noise buffer for hover effects
-      bufferRef.current = createNoiseBuffer(ctx);
-      isInitializedRef.current = true;
-      
-      // Play confirmation sound so user knows audio is working
-      playUnlockSound(ctx);
-      
-      setIsMuted(false);
-    } catch (e) {
-      console.warn('Audio initialization failed:', e);
-    }
-  }, [createNoiseBuffer, playUnlockSound]);
-
-  const playHover = useCallback(() => {
-    if (isMuted || !audioCtxRef.current || !bufferRef.current) return;
-    
-    const ctx = audioCtxRef.current;
-    
-    // Ensure context is running (can get suspended on mobile after tab switch)
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-      return; // Skip this sound, next one will work
-    }
-    
-    try {
-      const t = ctx.currentTime;
-      const source = ctx.createBufferSource();
-      source.buffer = bufferRef.current;
-      
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.value = 2000;
-
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.08, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
-
-      source.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-      
-      source.start(t);
-      source.stop(t + 0.02);
-    } catch {
-      // Silently fail for audio errors
-    }
-  }, [isMuted]);
-
-  const toggleMute = useCallback(() => {
-    if (isMuted) {
-      // initAudio is async but we don't need to await here
-      // The state update will happen after audio is ready
-      initAudio();
-    } else {
-      setIsMuted(true);
-    }
-  }, [isMuted, initAudio]);
-
-  useEffect(() => {
-    return () => {
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close().catch(() => {});
-      }
-    };
-  }, []);
-
-  return { isMuted, toggleMute, playHover };
-};
-
-// --- OPTIMIZED THREE.JS BACKGROUND ---
-const FlowFieldBackground = memo(({ isMobile, isLowPower }: { isMobile: boolean; isLowPower: boolean }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    if (!containerRef.current || isLowPower) return;
-
-    let animationId: number;
-    let isRunning = true;
-
-    const initThreeJS = () => {
-      const THREE = (window as unknown as { THREE: typeof import('three') }).THREE;
-      if (!THREE || !containerRef.current) return;
-
-      const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x000000, 0.002);
-
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-      camera.position.z = isMobile ? 70 : 50;
-
-      const renderer = new THREE.WebGLRenderer({ 
-        alpha: true, 
-        antialias: !isMobile,
-        powerPreference: 'high-performance'
-      });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
-      containerRef.current.appendChild(renderer.domElement);
-
-      const particleCount = isMobile ? 1500 : 4000;
-      
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(particleCount * 3);
-      const velocities = new Float32Array(particleCount * 3);
-      
-      const xRange = isMobile ? 150 : 300;
-      const yRange = isMobile ? 250 : 150;
-
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        positions[i3] = (Math.random() - 0.5) * xRange;
-        positions[i3 + 1] = (Math.random() - 0.5) * yRange;
-        positions[i3 + 2] = (Math.random() - 0.5) * 100;
-        velocities[i3] = Math.random() * 0.05 + 0.02;
-      }
-
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      
-      const material = new THREE.PointsMaterial({
-        size: isMobile ? 0.25 : 0.15,
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.5,
-        sizeAttenuation: true
-      });
-
-      const points = new THREE.Points(geometry, material);
-      scene.add(points);
-
-      const fovRad = (75 * Math.PI / 180) / 2;
-      let planeHeight = 2 * Math.tan(fovRad) * camera.position.z;
-      let planeWidth = planeHeight * (window.innerWidth / window.innerHeight);
-
-      let mouseX = 0, mouseY = 0;
-      let targetX = 0, targetY = 0;
-
-      const handleMouseMove = (e: MouseEvent) => {
-        targetX = ((e.clientX / window.innerWidth) - 0.5) * planeWidth;
-        targetY = -((e.clientY / window.innerHeight) - 0.5) * planeHeight;
-      };
-
-      const handleTouchMove = (e: TouchEvent) => {
-        if (e.touches.length > 0) {
-          const touch = e.touches[0];
-          targetX = ((touch.clientX / window.innerWidth) - 0.5) * planeWidth;
-          targetY = -((touch.clientY / window.innerHeight) - 0.5) * planeHeight;
-        }
-      };
-      
-      if (!isMobile) {
-        document.addEventListener('mousemove', handleMouseMove, { passive: true });
-      } else {
-        document.addEventListener('touchmove', handleTouchMove, { passive: true });
-      }
-
-      const boundX = isMobile ? 80 : 150;
-      const boundY = isMobile ? 120 : 80;
-      const interactionRadius = isMobile ? 80 : 60;
-      const interactionRadiusSq = interactionRadius * interactionRadius;
-
-      const animate = () => {
-        if (!isRunning) return;
-        animationId = requestAnimationFrame(animate);
-        
-        mouseX += (targetX - mouseX) * 0.1;
-        mouseY += (targetY - mouseY) * 0.1;
-
-        const pos = points.geometry.attributes.position.array as Float32Array;
-        const time = performance.now() * 0.0005;
-
-        for (let i = 0; i < particleCount; i++) {
-          const i3 = i * 3;
-          
-          const px = pos[i3];
-          const py = pos[i3 + 1];
-          const pz = pos[i3 + 2];
-
-          let vx = velocities[i3];
-          let vy = Math.sin(px * 0.05 + time) * 0.01;
-          let vz = Math.cos(px * 0.03 + time) * 0.01;
-
-          const dx = mouseX - px;
-          const dy = mouseY - py;
-          
-          if (Math.abs(dx) < interactionRadius && Math.abs(dy) < interactionRadius) {
-            const dz = -pz;
-            const distSq = dx * dx + dy * dy + dz * dz;
-
-            if (distSq < interactionRadiusSq) {
-              const dist = Math.sqrt(distSq);
-              const normDist = dist / interactionRadius;
-              const influence = (1 - normDist) ** 3;
-
-              vx += (dx * 0.005 + -dy * 0.02 + (Math.random() - 0.5) * 0.05) * influence;
-              vy += (dy * 0.005 + dx * 0.02 + (Math.random() - 0.5) * 0.05) * influence;
-              vz += dz * 0.005 * influence;
-
-              if (dist < 10) {
-                const push = (10 - dist) * 0.02;
-                vx -= dx * push;
-                vy -= dy * push;
-              }
-            }
-          }
-
-          pos[i3] += vx;
-          pos[i3 + 1] += vy;
-          pos[i3 + 2] += vz;
-
-          if (pos[i3] > boundX) {
-            pos[i3] = -boundX;
-            pos[i3 + 1] = (Math.random() - 0.5) * boundY * 2;
-            pos[i3 + 2] = (Math.random() - 0.5) * 100;
-          }
-          if (pos[i3 + 1] > boundY) pos[i3 + 1] = -boundY;
-          if (pos[i3 + 1] < -boundY) pos[i3 + 1] = boundY;
-        }
-        
-        points.geometry.attributes.position.needsUpdate = true;
-        scene.rotation.y = Math.sin(time * 0.1) * 0.02;
-        renderer.render(scene, camera);
-      };
-
-      animate();
-
-      let resizeTimeout: number;
-      const handleResize = () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = window.setTimeout(() => {
-          const width = window.innerWidth;
-          const height = window.innerHeight;
-          
-          camera.aspect = width / height;
-          camera.updateProjectionMatrix();
-          renderer.setSize(width, height);
-          
-          planeHeight = 2 * Math.tan(fovRad) * camera.position.z;
-          planeWidth = planeHeight * (width / height);
-        }, 100);
-      };
-      
-      window.addEventListener('resize', handleResize, { passive: true });
-
-      cleanupRef.current = () => {
-        isRunning = false;
-        cancelAnimationFrame(animationId);
-        clearTimeout(resizeTimeout);
-        
-        if (!isMobile) {
-          document.removeEventListener('mousemove', handleMouseMove);
-        } else {
-          document.removeEventListener('touchmove', handleTouchMove);
-        }
-        window.removeEventListener('resize', handleResize);
-        
-        geometry.dispose();
-        material.dispose();
-        renderer.dispose();
-        
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
-      };
-    };
-
-    if ((window as unknown as { THREE: unknown }).THREE) {
-      initThreeJS();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-      script.async = true;
-      script.onload = initThreeJS;
-      document.head.appendChild(script);
-    }
-
-    return () => {
-      cleanupRef.current?.();
-    };
-  }, [isMobile, isLowPower]);
-
-  if (isLowPower) {
-    return <div className="fixed inset-0 z-0 bg-gradient-to-br from-black via-gray-900 to-black" />;
-  }
-
-  return <div ref={containerRef} className="fixed inset-0 z-0 bg-black" aria-hidden="true" />;
-});
-
-FlowFieldBackground.displayName = 'FlowFieldBackground';
-
-// --- LIST ITEM COMPONENT ---
-const ListItem = memo(({ index, title, subtitle, description, tags, link, playHover, date, companyUrl }: ListItemProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  // Stagger delay based on row index — each row cascades in 120ms after the previous.
-  const revealDelay = (parseInt(index, 10) - 1) * 120 + 250;
-
-  const handleClick = () => {
-    setIsExpanded(!isExpanded);
-    playHover();
-  };
-
-  return (
-    <div
-      className="group border-t border-white/20 hover:border-white/60 transition-colors duration-300 stagger-reveal"
-      style={{ animationDelay: `${revealDelay}ms` }}
-      onMouseEnter={playHover}
-    >
-      <div
-        className="py-5 sm:py-6 md:py-8 flex flex-col md:flex-row md:items-baseline justify-between gap-2 md:gap-4 cursor-pointer row-lift"
-        onClick={handleClick}
-        onKeyDown={(e) => e.key === 'Enter' && handleClick()}
-        tabIndex={0}
-        role="button"
-        aria-expanded={isExpanded}
-      >
-        <div className="flex items-baseline gap-3 sm:gap-4 md:gap-6 md:w-1/3">
-          <span className="font-mono text-xs md:text-sm text-gray-500 font-medium">0{index}</span>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-cyan-200 transition-colors duration-300">
-                {title}
-              </h3>
-              {companyUrl && (
-                <a
-                  href={companyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-gray-500 hover:text-cyan-400 transition-colors p-1 hover:bg-white/10 rounded"
-                  title="Visit company website"
-                  aria-label={`Visit ${title} website (opens in new tab)`}
-                >
-                  <Boop>
-                    <ArrowUpRight className="w-4 h-4" />
-                  </Boop>
-                </a>
-              )}
-            </div>
-            {subtitle && (
-              <p className="text-xs md:text-sm font-mono text-cyan-400 mt-1 md:mt-2 font-medium">
-                {subtitle}
-              </p>
-            )}
-            {date && (
-              <p className="text-[10px] sm:text-xs font-mono text-gray-500 mt-1 flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {date}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="hidden md:block md:w-1/6 font-mono text-xs text-gray-400 uppercase tracking-widest font-medium group-hover:text-white transition-colors">
-          {tags?.[0]}
-        </div>
-
-        {/* Mobile: Always show on tap, Desktop: Show on hover */}
-        <div className={`md:w-1/2 overflow-hidden transition-all duration-500 ease-in-out
-          ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 md:group-hover:max-h-80 md:group-hover:opacity-100'}`}
-        >
-          <div className="text-gray-200 text-sm md:text-base leading-relaxed mb-4 md:mb-6 max-w-lg mt-4 md:mt-0">
-            {description}
-          </div>
-          <div className="flex flex-wrap gap-2 pb-2">
-            {tags.slice(1).map((t) => (
-              <span
-                key={t}
-                className="tag-pop text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 hover:border-cyan-400/60 hover:text-cyan-100"
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {link && (
-          <Boop>
-            <ArrowUpRight className="hidden md:block w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white transition-colors duration-300 flex-shrink-0" />
-          </Boop>
-        )}
-      </div>
-    </div>
-  );
-});
-
-ListItem.displayName = 'ListItem';
-
-// --- BUILD ITEM COMPONENT ---
-interface BuildItemProps {
-  index: string;
+interface Entry {
+  id: string;
   title: string;
   subtitle: string;
-  image?: string;
-  description: React.ReactNode;
+  date?: string;
+  url?: string;
+  urlLabel?: string;
   tags: string[];
-  link?: string;
-  collaborators?: string;
-  sponsors?: string;
-  playHover: () => void;
+  body: ReactNode;
+  note?: ReactNode;
+  figure?: { src: string; alt: string; caption: string };
 }
 
-const BuildItem = memo(({ index, title, subtitle, image, description, tags, link, collaborators, sponsors, playHover }: BuildItemProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const revealDelay = (parseInt(index, 10) - 1) * 120 + 250;
+const EXPERIENCE: Entry[] = [
+  {
+    id: 'aivid-tech-vision',
+    title: 'Aivid Tech Vision',
+    subtitle: 'Computer Vision Intern',
+    date: 'Feb 2025 – July 2025',
+    url: 'https://aivid.ai/about-us/',
+    urlLabel: 'aivid.ai',
+    tags: ['Edge AI', 'PyTorch', 'Docker', 'OpenCV', 'Real-time Systems'],
+    body: (
+      <ul>
+        <li>Engineered and deployed deep learning models for people-counting, demographic classification, and product defect detection; achieved 95%+ accuracy.</li>
+        <li>Automated SOP-compliance workflows by integrating IP camera feeds with AIVID BOTS, reducing client manual review time by 70%.</li>
+        <li>Architected real-time alerting systems (fire, intrusion, theft) with sub-5s end-to-end latency.</li>
+        <li>Optimized edge inference via model quantization and distributed pipelines, reducing network bandwidth consumption by 40%.</li>
+      </ul>
+    ),
+  },
+];
 
-  const handleClick = () => {
-    setIsExpanded(!isExpanded);
-    playHover();
+const PROJECTS: Entry[] = [
+  {
+    id: 'sec-alpha-gen',
+    title: 'SEC Alpha Gen',
+    subtitle: 'Alphathon 2025',
+    url: 'https://github.com/Rushi0070/sec-investment-signals',
+    urlLabel: 'github',
+    tags: ['NLP', 'FinBERT', 'CatBoost', 'SHAP', 'Quantitative Finance'],
+    body: (
+      <p>
+        Quantitative NLP pipeline processing SEC 10-K/10-Q filings. Utilized FinBERT and RoBERTa to detect narrative shifts and generate tradable signals. Trained CatBoost with SHAP explainability achieving 76.92% accuracy and 1.90 Sharpe ratio.
+      </p>
+    ),
+  },
+  {
+    id: 'uber-demand-forecast',
+    title: 'Uber Demand Forecast',
+    subtitle: 'MLOps Pipeline',
+    tags: ['MLOps', 'XGBoost', 'DVC', 'Docker', 'CI/CD'],
+    body: (
+      <p>
+        Production-grade time-series forecasting pipeline for NYC cab demand using XGBoost. Engineered temporal and geospatial features with sliding-window cross-validation. Containerized with Docker, versioned with DVC, and CI/CD with GitHub Actions.
+      </p>
+    ),
+  },
+];
+
+const BUILDS: Entry[] = [
+  {
+    id: 'vitalsync',
+    title: 'VitalSync',
+    subtitle: 'Columbia University Hackathon // Qualcomm',
+    url: 'https://github.com/Rushi0070/VitalSync',
+    urlLabel: 'github',
+    tags: ['Edge AI', 'Snapdragon NPU', 'Qwen 6B VLM', 'YOLOv8', 'ONNX', 'React Native', 'On-Device ML'],
+    note: (
+      <>
+        sponsors: Qualcomm, Columbia University.
+        <br />
+        built with Ishan Vaghani, Ying Lo, Charisse Lai.
+      </>
+    ),
+    figure: {
+      src: '/images/vitalsync.png',
+      alt: 'VitalSync',
+      caption: 'VitalSync, built at the Columbia University Hackathon sponsored by Qualcomm',
+    },
+    body: (
+      <>
+        <p>
+          Just wrapped up an incredible week at the Columbia University Hackathon, sponsored by Qualcomm, where our team architected VitalSync: a multi-device ecosystem that redefines productivity through on-device edge intelligence. Designed to bridge the gap between deep-work "flow states" and physical well-being, VitalSync leverages the Snapdragon platform to run a dual-model pipeline: a Qwen 6B VLM on the NPU (via ONNX) for deep screen-context analysis and a YOLOv8 model on the integrated GPU for real-time physical activity tracking.
+        </p>
+        <p>
+          The core of VitalSync is accountability; when the system detects procrastination or a vital need for hydration and movement, it triggers a persistent "task-locked" popup that only closes once the vision models verify the task has been completed. This entire experience is managed via a React Native Android remote featuring seamless state persistence and haptic feedback, allowing users to initiate background PC sessions directly from their phones.
+        </p>
+        <p>
+          By optimizing model memory loading to preserve primary compute for daily tasks, we have created a performance "Vital Score" summary system that scales from personal wellness to enterprise-level employee productivity, proving that the future of private, responsive AI belongs on the edge.
+        </p>
+      </>
+    ),
+  },
+];
+
+const STACK: { title: string; items: string[] }[] = [
+  { title: 'Languages', items: ['Python', 'C++', 'Java', 'SQL', 'TypeScript'] },
+  { title: 'ML & AI', items: ['PyTorch', 'TensorFlow', 'HuggingFace', 'XGBoost', 'OpenCV'] },
+  { title: 'Infrastructure', items: ['Docker', 'AWS SageMaker', 'Git', 'DVC', 'Linux'] },
+  { title: 'Tools', items: ['Pandas', 'NumPy', 'Streamlit', 'Plotly', 'pytest'] },
+];
+
+interface Heading {
+  id: string;
+  text: string;
+  level: 2 | 3;
+}
+
+const HEADINGS: Heading[] = [
+  { id: 'experience', text: 'experience', level: 2 },
+  ...EXPERIENCE.map((e) => ({ id: e.id, text: e.title, level: 3 as const })),
+  { id: 'projects', text: 'projects', level: 2 },
+  ...PROJECTS.map((e) => ({ id: e.id, text: e.title, level: 3 as const })),
+  { id: 'recent-builds', text: 'recent builds', level: 2 },
+  ...BUILDS.map((e) => ({ id: e.id, text: e.title, level: 3 as const })),
+  { id: 'stack', text: 'stack', level: 2 },
+  { id: 'education', text: 'education', level: 2 },
+  { id: 'leadership', text: 'leadership', level: 2 },
+  { id: 'contact', text: 'contact', level: 2 },
+];
+
+// --- Small pieces -------------------------------------------------------------
+
+const tag = (t: string) => `#${t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+
+function H({ id, level, children }: { id: string; level: 2 | 3; children: ReactNode }) {
+  const Tag = level === 2 ? 'h2' : 'h3';
+  return (
+    <Tag id={id}>
+      {children}
+      <a className="anchor" href={`#${id}`} aria-label="Link to this section">#</a>
+    </Tag>
+  );
+}
+
+function External({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
+}
+
+function EntryBlock({ e }: { e: Entry }) {
+  const hasNote = e.date || e.url || e.note;
+  return (
+    <>
+      <H id={e.id} level={3}>
+        {e.title}
+      </H>
+      {hasNote && (
+        <aside className="marginnote">
+          {e.date && <>{e.date}<br /></>}
+          {e.url && <External href={e.url}>{e.urlLabel ?? e.url} ↗</External>}
+          {e.url && e.note && <br />}
+          {e.note}
+        </aside>
+      )}
+      <p className="entry-meta">
+        {e.subtitle}
+        {e.tags.length > 0 && <span> · {e.tags.map(tag).join('  ')}</span>}
+      </p>
+      {e.figure && (
+        <figure>
+          <img src={e.figure.src} alt={e.figure.alt} loading="lazy" />
+          <figcaption>{e.figure.caption}</figcaption>
+        </figure>
+      )}
+      {e.body}
+    </>
+  );
+}
+
+// --- Chrome -------------------------------------------------------------------
+
+function Nav() {
+  return (
+    <nav className="site-nav mono">
+      <a href="/" className="site-name">~/rushijhala</a>
+      <div className="site-links">
+        <External href={BLOG_URL}>[blog]</External>
+        <a href={LINKS.resume} download="Rushi_Jhala_Resume.pdf">[resume]</a>
+        <a href="#contact">[contact]</a>
+      </div>
+    </nav>
+  );
+}
+
+function ReadingProgress() {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const total = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(total > 0 ? Math.min(1, Math.max(0, window.scrollY / total)) : 0);
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+  return (
+    <div className="reading-progress" aria-hidden="true">
+      <div className="reading-progress-bar" style={{ transform: `scaleX(${progress})` }} />
+    </div>
+  );
+}
+
+// Highlights the section you are reading: the last heading whose top has
+// scrolled above a line near the top of the viewport (same rule as the blog).
+function Toc({ headings }: { headings: Heading[] }) {
+  const [active, setActive] = useState(headings[0]?.id ?? '');
+  const ticking = useRef(false);
+
+  useEffect(() => {
+    const READ_LINE = 120;
+    const update = () => {
+      ticking.current = false;
+      let current = headings[0].id;
+      for (const h of headings) {
+        const el = document.getElementById(h.id);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= READ_LINE) current = h.id;
+        else break;
+      }
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
+        current = headings[headings.length - 1].id;
+      }
+      setActive(current);
+    };
+    const onScroll = () => {
+      if (ticking.current) return;
+      ticking.current = true;
+      requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [headings]);
+
+  const go = (e: MouseEvent<HTMLAnchorElement>, id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    e.preventDefault();
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    history.replaceState(null, '', `#${id}`);
+    setActive(id);
   };
 
   return (
-    <div
-      className="group border-t border-white/20 hover:border-white/60 transition-colors duration-300 stagger-reveal"
-      style={{ animationDelay: `${revealDelay}ms` }}
-      onMouseEnter={playHover}
-    >
-      <div
-        className="py-5 sm:py-6 md:py-8 cursor-pointer row-lift"
-        onClick={handleClick}
-        onKeyDown={(e) => e.key === 'Enter' && handleClick()}
-        tabIndex={0}
-        role="button"
-        aria-expanded={isExpanded}
-      >
-        <div className="flex flex-col md:flex-row md:items-baseline justify-between gap-2 md:gap-4">
-          <div className="flex items-baseline gap-3 sm:gap-4 md:gap-6 md:w-1/3">
-            <span className="font-mono text-xs md:text-sm text-gray-500 font-medium">0{index}</span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xl sm:text-2xl md:text-3xl font-medium text-white group-hover:text-cyan-200 transition-colors duration-300">
-                  {title}
-                </h3>
-                {link && (
-                  <a
-                    href={link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-gray-500 hover:text-cyan-400 transition-colors p-1 hover:bg-white/10 rounded"
-                    title="View repository"
-                    aria-label={`View ${title} repository (opens in new tab)`}
-                  >
-                    <Boop>
-                      <ArrowUpRight className="w-4 h-4" />
-                    </Boop>
-                  </a>
-                )}
-              </div>
-              <p className="text-xs md:text-sm font-mono text-cyan-400 mt-1 md:mt-2 font-medium">
-                {subtitle}
-              </p>
-            </div>
-          </div>
-
-          <div className="hidden md:block md:w-1/6 font-mono text-xs text-gray-400 uppercase tracking-widest font-medium group-hover:text-white transition-colors duration-300">
-            {tags?.[0]}
-          </div>
-
-          <div className="hidden md:block md:w-1/2" />
-
-          {link && (
-            <Boop>
-              <ArrowUpRight className="hidden md:block w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white transition-colors duration-300 flex-shrink-0" />
-            </Boop>
-          )}
-        </div>
-
-        <div className={`overflow-hidden transition-all duration-700 ease-in-out
-          ${isExpanded ? 'max-h-[900px] opacity-100' : 'max-h-0 opacity-0 md:group-hover:max-h-[900px] md:group-hover:opacity-100'}`}
-        >
-          <div className="pt-6 md:pt-8">
-            <div className="flex flex-col md:flex-row gap-6 md:gap-10">
-              {image && (
-                <div className="md:w-2/5 flex-shrink-0 rounded-lg overflow-hidden border border-white/10 self-start">
-                  <img
-                    src={image}
-                    alt={title}
-                    className="w-full h-auto object-cover aspect-[4/3]"
-                    loading="lazy"
-                  />
-                </div>
-              )}
-
-              <div className="md:w-3/5">
-                <div className="text-gray-200 text-sm md:text-base leading-relaxed mb-4 md:mb-5">
-                  {description}
-                </div>
-
-                {sponsors && (
-                  <p className="text-xs md:text-sm font-mono text-cyan-400 mb-1">
-                    <span className="text-gray-500">Sponsors:</span> {sponsors}
-                  </p>
-                )}
-
-                {collaborators && (
-                  <p className="text-xs md:text-sm font-mono text-cyan-400 mb-4 md:mb-5">
-                    <span className="text-gray-500">Team:</span> {collaborators}
-                  </p>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  {tags.slice(1).map((t) => (
-                    <span
-                      key={t}
-                      className="tag-pop text-[10px] md:text-xs font-mono text-gray-300 border border-white/20 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/5 hover:bg-white/10 hover:border-cyan-400/60 hover:text-cyan-100"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <nav className="toc-fixed" aria-label="Table of contents">
+      <div className="toc-label">on this page</div>
+      <ul className="toc-list">
+        {headings.map((h) => (
+          <li
+            key={h.id}
+            className={`toc-item ${active === h.id ? 'is-active' : ''}`}
+            style={{ paddingLeft: 12 + (h.level - 2) * 12 }}
+          >
+            <a href={`#${h.id}`} onClick={(e) => go(e, h.id)}>
+              {h.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
-});
+}
 
-BuildItem.displayName = 'BuildItem';
+function LiveClock() {
+  const fmt = () =>
+    new Date().toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: 'America/New_York',
+    });
+  const [time, setTime] = useState(fmt);
+  useEffect(() => {
+    const t = setInterval(() => setTime(fmt()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return <>{time.toLowerCase()} et</>;
+}
 
-// --- STACK CATEGORY ---
-const StackCategory = memo(({ title, items, playHover }: StackCategory & { playHover: () => void }) => (
-  <div onMouseEnter={playHover} className="group">
-    <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 sm:mb-6 pb-2 border-b border-white/10 group-hover:border-cyan-400/60 transition-colors inline-block">
-      {title}
-    </h3>
-    <ul className="space-y-2 sm:space-y-3">
-      {items.map((item, i) => (
-        <li
-          key={item}
-          className="stagger-reveal text-sm text-gray-300 hover:text-cyan-100 transition-colors cursor-default block font-medium py-1"
-          style={{ animationDelay: `${300 + i * 70}ms` }}
-        >
-          <span className="tag-pop inline-block">{item}</span>
-        </li>
-      ))}
-    </ul>
-  </div>
-));
+// --- Page ---------------------------------------------------------------------
 
-StackCategory.displayName = 'StackCategory';
+export default function App() {
+  return (
+    <div className="site">
+      <ReadingProgress />
+      <Nav />
 
-// --- SECTION HEADING ---
-// Reusable H2 with SplitText reveal + drawn underline underneath.
-// The `keyId` forces React to remount the spans when the section key changes,
-// so each section re-animates on tab switch.
-const SectionHeading = memo(({
-  id,
-  text,
-  keyId,
-  className = 'text-xs font-mono text-gray-400 uppercase tracking-widest mb-6 sm:mb-8 md:mb-12 font-bold',
-}: {
-  id: string;
-  text: string;
-  keyId: string;
-  className?: string;
-}) => (
-  <div className="mb-6 sm:mb-8 md:mb-12">
-    <h2 id={id} className={className.replace(/mb-\S+/g, '').trim() + ' pb-3 inline-block'}>
-      <SplitText text={text} keyId={keyId} delay={100} />
-    </h2>
-    <span className="underline-draw max-w-[280px] block" aria-hidden="true" />
-  </div>
-));
-SectionHeading.displayName = 'SectionHeading';
+      <main>
+        <article className="post">
+          <Toc headings={HEADINGS} />
 
-// --- SECTION COMPONENTS ---
-const WorkSection = memo(({ playHover }: { playHover: () => void }) => (
-  <section className="animate-in fade-in" aria-labelledby="work-heading">
-    <SectionHeading id="work-heading" text="Professional Experience" keyId="work" />
-    <div className="w-full">
-      <ListItem
-        index="1"
-        title="Aivid Tech Vision"
-        subtitle="Computer Vision Intern"
-        date="Feb 2025 – July 2025"
-        companyUrl="https://aivid.ai/about-us/"
-        description={
-          <ul className="list-disc pl-4 space-y-2 sm:space-y-3 text-gray-200">
-            <li>Engineered and deployed deep learning models for people-counting, demographic classification, and product defect detection; achieved 95%+ accuracy.</li>
-            <li>Automated SOP-compliance workflows by integrating IP camera feeds with AIVID BOTS, reducing client manual review time by 70%.</li>
-            <li>Architected real-time alerting systems (fire, intrusion, theft) with sub-5s end-to-end latency.</li>
-            <li>Optimized edge inference via model quantization and distributed pipelines, reducing network bandwidth consumption by 40%.</li>
-          </ul>
-        }
-        tags={['Edge AI', 'PyTorch', 'Docker', 'OpenCV', 'Real-time Systems']}
-        playHover={playHover}
-      />
-    </div>
-  </section>
-));
-
-WorkSection.displayName = 'WorkSection';
-
-const ProjectsSection = memo(({ playHover }: { playHover: () => void }) => (
-  <section className="animate-in fade-in" aria-labelledby="projects-heading">
-    <SectionHeading id="projects-heading" text="Academic & Personal Projects" keyId="projects" />
-    <div className="w-full">
-      <ListItem
-        index="1"
-        title="SEC Alpha Gen"
-        subtitle="Alphathon 2025"
-        description="Quantitative NLP pipeline processing SEC 10-K/10-Q filings. Utilized FinBERT and RoBERTa to detect narrative shifts and generate tradable signals. Trained CatBoost with SHAP explainability achieving 76.92% accuracy and 1.90 Sharpe ratio."
-        tags={['NLP', 'FinBERT', 'CatBoost', 'SHAP', 'Quantitative Finance']}
-        link="#"
-        companyUrl="https://github.com/Rushi0070/sec-investment-signals"
-        playHover={playHover}
-      />
-      <ListItem
-        index="2"
-        title="Uber Demand Forecast"
-        subtitle="MLOps Pipeline"
-        description="Production-grade time-series forecasting pipeline for NYC cab demand using XGBoost. Engineered temporal and geospatial features with sliding-window cross-validation. Containerized with Docker, versioned with DVC, and CI/CD with GitHub Actions."
-        tags={['MLOps', 'XGBoost', 'DVC', 'Docker', 'CI/CD']}
-        link="#"
-        playHover={playHover}
-      />
-    </div>
-  </section>
-));
-
-ProjectsSection.displayName = 'ProjectsSection';
-
-const BuildsSection = memo(({ playHover }: { playHover: () => void }) => (
-  <section className="animate-in fade-in" aria-labelledby="builds-heading">
-    <SectionHeading id="builds-heading" text="Recent Builds" keyId="builds" />
-    <div className="w-full">
-      <BuildItem
-        index="1"
-        title="VitalSync"
-        subtitle="Columbia University Hackathon // Qualcomm"
-        image="/images/vitalsync.png"
-        description={
-          <>
-            <p className="mb-4">
-              Just wrapped up an incredible week at the Columbia University Hackathon, sponsored by Qualcomm, where our team architected VitalSync: a multi-device ecosystem that redefines productivity through on-device edge intelligence. Designed to bridge the gap between deep-work "flow states" and physical well-being, VitalSync leverages the Snapdragon platform to run a dual-model pipeline: a Qwen 6B VLM on the NPU (via ONNX) for deep screen-context analysis and a YOLOv8 model on the integrated GPU for real-time physical activity tracking.
+          <header>
+            <h1 className="post-title">rushi jhala</h1>
+            <p className="post-summary">
+              Data Science graduate student at Stony Brook University, specializing in Computer Vision and NLP.
             </p>
-            <p className="mb-4">
-              The core of VitalSync is accountability; when the system detects procrastination or a vital need for hydration and movement, it triggers a persistent "task-locked" popup that only closes once the vision models verify the task has been completed. This entire experience is managed via a React Native Android remote featuring seamless state persistence and haptic feedback, allowing users to initiate background PC sessions directly from their phones.
+            <div className="post-meta">
+              <span>Long Island, NY · <LiveClock /></span>
+              <span> · Seeking Summer 2026 Internship</span>
+              <span> · #cv #nlp #edge-ai #mlops</span>
+            </div>
+          </header>
+
+          <div className="prose">
+            <p>
+              I am a Data Science Graduate Student specializing in Computer Vision and NLP. My work focuses on building robust, scalable intelligent systems for high-stakes environments like FinTech and Industrial IoT.
             </p>
             <p>
-              By optimizing model memory loading to preserve primary compute for daily tasks, we have created a performance "Vital Score" summary system that scales from personal wellness to enterprise-level employee productivity, proving that the future of private, responsive AI belongs on the edge.
+              I also write about machine learning on my blog, <External href={BLOG_URL}>sololeveling</External>.
             </p>
-          </>
-        }
-        tags={['Edge AI', 'Snapdragon NPU', 'Qwen 6B VLM', 'YOLOv8', 'ONNX', 'React Native', 'On-Device ML']}
-        link="https://github.com/Rushi0070/VitalSync"
-        sponsors="Qualcomm, Columbia University"
-        collaborators="Ishan Vaghani, Ying Lo, Charisse Lai"
-        playHover={playHover}
-      />
-    </div>
-  </section>
-));
 
-BuildsSection.displayName = 'BuildsSection';
+            <div className="callout">
+              <span className="callout-mark">›</span>
+              <p>
+                tl;dr: computer vision intern at Aivid Tech Vision (95%+ accuracy models, sub-5s alerting on the edge), quantitative NLP on SEC filings for Alphathon 2025, and VitalSync, an on-device AI build for the Qualcomm-sponsored Columbia University Hackathon.
+              </p>
+            </div>
 
-const AboutSection = memo(() => (
-  <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 md:gap-16 animate-in fade-in" aria-labelledby="about-heading">
-    <div className="lg:col-span-5">
-      <h2 id="about-heading" className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-normal leading-tight mb-6 sm:mb-8 text-white text-balance">
-        <span className="block"><SplitText text="Bridging" keyId="about-1" delay={100} stepMs={45} /></span>
-        <span className="block text-gray-500"><SplitText text="Theory" keyId="about-2" delay={450} stepMs={45} /></span>
-        <span className="block"><SplitText text="& Production." keyId="about-3" delay={800} stepMs={45} /></span>
-      </h2>
-      <span className="underline-draw max-w-[200px] block" aria-hidden="true" style={{ animationDelay: '1.4s' }} />
-    </div>
-    <div className="lg:col-span-7 space-y-8 sm:space-y-12 md:space-y-16">
-      <div className="stagger-reveal" style={{ animationDelay: '600ms' }}>
-        <p className="text-base sm:text-lg md:text-xl font-normal leading-relaxed text-gray-200 mb-6 sm:mb-8">
-          I am a Data Science Graduate Student specializing in Computer Vision and NLP. My work focuses on building robust, scalable intelligent systems for high-stakes environments like FinTech and Industrial IoT.
-        </p>
-        <div className="grid grid-cols-2 gap-6 sm:gap-8 font-mono text-xs text-gray-400 uppercase tracking-widest font-medium">
-          <div>
-            <span className="block text-white mb-2 font-bold">Education</span>
-            <span className="text-gray-300">Stony Brook Univ.</span><br/>
-            MS Data Science
+            <H id="experience" level={2}>experience</H>
+            {EXPERIENCE.map((e) => (
+              <EntryBlock key={e.id} e={e} />
+            ))}
+
+            <H id="projects" level={2}>projects</H>
+            {PROJECTS.map((e) => (
+              <EntryBlock key={e.id} e={e} />
+            ))}
+
+            <H id="recent-builds" level={2}>recent builds</H>
+            {BUILDS.map((e) => (
+              <EntryBlock key={e.id} e={e} />
+            ))}
+
+            <H id="stack" level={2}>stack</H>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>area</th>
+                    <th>tools</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {STACK.map((c) => (
+                    <tr key={c.title}>
+                      <td><strong>{c.title}</strong></td>
+                      <td>
+                        {c.items.map((item, i) => (
+                          <Fragment key={item}>
+                            {i > 0 && ', '}
+                            <code>{item}</code>
+                          </Fragment>
+                        ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <H id="education" level={2}>education</H>
+            <ul>
+              <li><strong>Stony Brook University</strong>, MS Data Science</li>
+              <li><strong>PDEU, India</strong>, B.Tech ICT (8.47 GPA)</li>
+            </ul>
+
+            <H id="leadership" level={2}>leadership</H>
+            <p>
+              As Core Committee Member (ML) at ACM Student Chapter PDEU, I organized a two-day DSA workshop covering C++, linear structures, and graph algorithms for 100+ students, and facilitated peer learning sessions for algorithmic problem-solving.
+            </p>
+
+            <H id="contact" level={2}>contact</H>
+            <p>You can reach me here:</p>
+            <ul>
+              <li>email: <a href={LINKS.email}>jhalarushi@gmail.com</a></li>
+              <li>linkedin: <External href={LINKS.linkedin}>rushi-jhala</External></li>
+              <li>github: <External href={LINKS.github}>Rushi0070</External></li>
+              <li>x: <External href={LINKS.x}>@JhalaRushi</External></li>
+              <li>resume: <a href={LINKS.resume} download="Rushi_Jhala_Resume.pdf">Rushi_Jhala_Resume.pdf</a></li>
+            </ul>
           </div>
-          <div>
-            <span className="block text-white mb-2 font-bold">Undergrad</span>
-            <span className="text-gray-300">PDEU, India</span><br/>
-            B.Tech ICT (8.47 GPA)
-          </div>
-        </div>
-      </div>
-      <div className="space-y-4 border-t border-white/20 pt-6 sm:pt-8 stagger-reveal" style={{ animationDelay: '800ms' }}>
-        <h3 className="text-base sm:text-lg font-bold text-white">Leadership Impact</h3>
-        <p className="text-sm md:text-base text-gray-300 font-normal leading-relaxed">
-          As Core Committee Member (ML) at ACM Student Chapter PDEU, I organized a two-day DSA workshop covering C++, linear structures, and graph algorithms for 100+ students, and facilitated peer learning sessions for algorithmic problem-solving.
-        </p>
-      </div>
-    </div>
-  </section>
-));
 
-AboutSection.displayName = 'AboutSection';
-
-const StackSection = memo(({ playHover }: { playHover: () => void }) => {
-  const categories = useMemo<StackCategory[]>(() => [
-    { title: "Languages", items: ["Python", "C++", "Java", "SQL", "TypeScript"] },
-    { title: "ML & AI", items: ["PyTorch", "TensorFlow", "HuggingFace", "XGBoost", "OpenCV"] },
-    { title: "Infrastructure", items: ["Docker", "AWS SageMaker", "Git", "DVC", "Linux"] },
-    { title: "Tools", items: ["Pandas", "NumPy", "Streamlit", "Plotly", "pytest"] }
-  ], []);
-
-  return (
-    <section className="animate-in fade-in" aria-labelledby="stack-heading">
-      <SectionHeading id="stack-heading" text="Technical Arsenal" keyId="stack" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 md:gap-12 lg:gap-16">
-        {categories.map((cat, i) => (
-          <div
-            key={cat.title}
-            className="stagger-reveal"
-            style={{ animationDelay: `${250 + i * 120}ms` }}
-          >
-            <StackCategory {...cat} playHover={playHover} />
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-});
-
-StackSection.displayName = 'StackSection';
-
-// --- ICON BUTTON (composed: Magnetic outer + Boop inner) ---
-// Keeps hover target steady (outer doesn't transform) while the icon
-// does the playful boop. Magnetic adds cursor-following drift on desktop.
-const IconLink = memo(({
-  children,
-  enableMagnetic,
-  ...rest
-}: React.AnchorHTMLAttributes<HTMLAnchorElement> & {
-  children: React.ReactNode;
-  enableMagnetic: boolean;
-}) => (
-  <a {...rest}>
-    <Magnetic enabled={enableMagnetic} strength={0.3}>
-      <Boop>{children}</Boop>
-    </Magnetic>
-  </a>
-));
-IconLink.displayName = 'IconLink';
-
-const IconButton = memo(({
-  children,
-  enableMagnetic,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  children: React.ReactNode;
-  enableMagnetic: boolean;
-}) => (
-  <button {...rest}>
-    <Magnetic enabled={enableMagnetic} strength={0.3}>
-      <Boop>{children}</Boop>
-    </Magnetic>
-  </button>
-));
-IconButton.displayName = 'IconButton';
-
-// --- MAIN COMPONENT ---
-export default function ArtisticPortfolio() {
-  const [activeSection, setActiveSection] = useState('work');
-  const { isMuted, toggleMute, playHover } = useSound();
-  const { isMobile, isLowPower } = useDeviceDetect();
-  const enableMagnetic = !isMobile && !isLowPower;
-
-  const navItems = useMemo(() => ['work', 'projects', 'Recent Builds', 'about', 'stack'], []);
-
-  const handleNavClick = useCallback((sec: string) => {
-    setActiveSection(sec);
-    playHover();
-  }, [playHover]);
-
-  const renderSection = useMemo(() => {
-    switch (activeSection) {
-      case 'work': return <WorkSection playHover={playHover} />;
-      case 'projects': return <ProjectsSection playHover={playHover} />;
-      case 'Recent Builds': return <BuildsSection playHover={playHover} />;
-      case 'about': return <AboutSection />;
-      case 'stack': return <StackSection playHover={playHover} />;
-      default: return null;
-    }
-  }, [activeSection, playHover]);
-
-  return (
-    <div className="min-h-screen min-h-[100dvh] text-white font-sans selection:bg-cyan-500 selection:text-black overflow-x-hidden bg-black">
-      <FlowFieldBackground isMobile={isMobile} isLowPower={isLowPower} />
-
-      {/* Skip to main content for accessibility */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:bg-cyan-500 focus:text-black focus:px-4 focus:py-2 focus:rounded"
-      >
-        Skip to main content
-      </a>
-
-      {!isLowPower && (
-        <div
-          className="fixed inset-0 pointer-events-none z-[1] opacity-20 brightness-100 contrast-150 mix-blend-overlay"
-          style={{ backgroundImage: "url('https://grainy-gradients.vercel.app/noise.svg')" }}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Header - Left: one-time split-letter reveal on first load */}
-      <header className="fixed top-4 left-4 sm:top-6 sm:left-6 md:top-8 md:left-8 z-50 mix-blend-difference safe-left safe-top mobile-header-left">
-        <h1 className="text-sm md:text-base font-bold tracking-widest uppercase text-white truncate">
-          <SplitText text="Rushi Jhala" keyId="name" delay={150} stepMs={55} />
-        </h1>
-        <p className="text-[10px] md:text-xs font-mono text-gray-300 mt-1 font-medium leading-relaxed">
-          <span className="hidden xs:inline">Stony Brook University</span>
-          <span className="xs:hidden">SBU</span>
-          <br className="sm:hidden" />
-          <span className="hidden sm:inline"> // </span>
-          <span className="hidden xs:inline">MS Data Science</span>
-          <span className="xs:hidden">MSDS</span>
-        </p>
-      </header>
-
-      {/* Header - Right: status dot gets ripple rings, location row shows live clock */}
-      <div className="fixed top-4 right-4 sm:top-6 sm:right-6 md:top-8 md:right-8 z-50 mix-blend-difference text-right safe-right safe-top mobile-header-right">
-        <div className="flex items-center justify-end gap-1.5 sm:gap-2">
-          <span className="relative w-1.5 h-1.5 md:w-2 md:h-2 flex-shrink-0">
-            <span className="absolute inset-0 bg-green-400 rounded-full pulse-glow" />
-            {!isLowPower && <span className="absolute inset-0 ripple-ring" aria-hidden="true" />}
-          </span>
-          <span className="text-[8px] xs:text-[9px] sm:text-[10px] md:text-xs font-mono tracking-wider sm:tracking-widest uppercase text-white font-bold leading-tight">
-            <span className="hidden xs:inline">Seeking Summer 2026 Internship</span>
-            <span className="xs:hidden">Open to Work</span>
-          </span>
-        </div>
-        <p className="hidden sm:flex text-[10px] md:text-xs font-mono text-gray-300 mt-1 font-medium items-center justify-end gap-1.5">
-          <MapPin className="w-3 h-3" />
-          <span>Long Island, NY</span>
-          <span className="text-gray-500">·</span>
-          <LiveClock />
-        </p>
-      </div>
-
-      {/* Navigation: active item shimmers, all items get magnetic drift on desktop */}
-      <nav
-        className="fixed bottom-4 sm:bottom-6 md:bottom-8 left-1/2 sm:left-6 md:left-8 -translate-x-1/2 sm:translate-x-0 z-50 flex gap-3 sm:gap-4 md:gap-8 mix-blend-difference overflow-x-auto max-w-[calc(100vw-1rem)] sm:max-w-none no-scrollbar safe-left safe-bottom select-none-touch"
-        role="navigation"
-        aria-label="Main navigation"
-      >
-        {navItems.map((sec) => {
-          const isActive = activeSection === sec;
-          return (
-            <button
-              key={sec}
-              onClick={() => handleNavClick(sec)}
-              onMouseEnter={playHover}
-              className={`relative text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-colors duration-300 whitespace-nowrap py-2 px-1 min-h-[36px] sm:min-h-[44px] flex items-center justify-center
-                ${isActive ? 'text-white' : 'text-gray-400 hover:text-white active:text-cyan-300'}`}
-              aria-current={isActive ? 'page' : undefined}
-            >
-              <Magnetic enabled={enableMagnetic} strength={0.4}>
-                <span className={isActive ? 'shimmer-text' : ''}>{sec}</span>
-              </Magnetic>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Socials & Audio: each icon gets Boop + Magnetic-on-desktop */}
-      <div className="fixed bottom-20 sm:bottom-6 md:bottom-8 left-1/2 sm:left-auto sm:right-6 md:right-8 -translate-x-1/2 sm:translate-x-0 z-50 flex gap-3 sm:gap-4 md:gap-5 mix-blend-difference items-center safe-bottom sm:safe-right">
-        <IconButton
-          onClick={toggleMute}
-          onMouseEnter={playHover}
-          enableMagnetic={enableMagnetic}
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
-          title={isMuted ? "Enable Sound" : "Mute Sound"}
-          aria-label={isMuted ? "Enable Sound" : "Mute Sound"}
-          aria-pressed={!isMuted}
-        >
-          {isMuted ? <VolumeX className="w-4 h-4 md:w-5 md:h-5" /> : <Volume2 className="w-4 h-4 md:w-5 md:h-5" />}
-        </IconButton>
-
-        <IconLink
-          href="/resume.pdf"
-          download="Rushi_Jhala_Resume.pdf"
-          onMouseEnter={playHover}
-          enableMagnetic={enableMagnetic}
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
-          title="Download Resume"
-          aria-label="Download Resume (PDF)"
-        >
-          <Download className="w-4 h-4 md:w-5 md:h-5" />
-        </IconLink>
-
-        <IconLink
-          href="mailto:jhalarushi@gmail.com"
-          onMouseEnter={playHover}
-          enableMagnetic={enableMagnetic}
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
-          aria-label="Send Email"
-        >
-          <Mail className="w-4 h-4 md:w-5 md:h-5" />
-        </IconLink>
-
-        <IconLink
-          href="https://linkedin.com/in/rushi-jhala-855076224"
-          onMouseEnter={playHover}
-          enableMagnetic={enableMagnetic}
-          className="text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[36px] min-h-[36px] xs:min-w-[40px] xs:min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="LinkedIn Profile (opens in new tab)"
-        >
-          <Linkedin className="w-4 h-4 md:w-5 md:h-5" />
-        </IconLink>
-
-        <IconLink
-          href="https://github.com/rushijhala"
-          onMouseEnter={playHover}
-          enableMagnetic={enableMagnetic}
-          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[44px] min-h-[44px] items-center justify-center"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="GitHub Profile (opens in new tab)"
-        >
-          <Github className="w-4 h-4 md:w-5 md:h-5" />
-        </IconLink>
-
-        <IconLink
-          href="https://x.com/JhalaRushi"
-          onMouseEnter={playHover}
-          enableMagnetic={enableMagnetic}
-          className="hidden sm:flex text-gray-400 hover:text-white active:text-cyan-300 transition-colors p-2 min-w-[44px] min-h-[44px] items-center justify-center"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Twitter/X Profile (opens in new tab)"
-        >
-          <Twitter className="w-4 h-4 md:w-5 md:h-5" />
-        </IconLink>
-      </div>
-
-      {/* Main Content — key on activeSection forces re-mount so reveal animations replay */}
-      <main
-        id="main-content"
-        className="relative z-10 pt-24 sm:pt-28 pb-40 sm:pb-32 md:pb-40 px-4 sm:px-6 md:px-12 lg:px-24 max-w-7xl mx-auto min-h-screen min-h-[100dvh] flex flex-col justify-center"
-        role="main"
-      >
-        <div key={activeSection}>
-          {renderSection}
-        </div>
+          <div className="rule" aria-hidden="true" />
+        </article>
       </main>
-      </div>
+
+      <footer className="site-footer mono">
+        <span>© {new Date().getFullYear()} · rushi jhala</span>
+        <span>
+          <External href={BLOG_URL}>blog</External> · <a href={LINKS.email}>email</a> ·{' '}
+          <External href={LINKS.github}>github</External>
+        </span>
+      </footer>
+    </div>
   );
 }
