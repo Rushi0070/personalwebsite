@@ -1,466 +1,443 @@
-import { useEffect, useRef, useState } from 'react';
-import type { MouseEvent, ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { CHECKPOINTS, CONFIG, EPOCH0, LINKS, PERSON, RUN_END } from './data';
+import { daysBetween } from './run';
+import LossChart from './components/LossChart';
+import Terminal from './components/Terminal';
+import Buffer from './components/Buffer';
+import type { TerminalHandle } from './components/Terminal';
 
-// "Dark notebook": the portfolio keeps its own identity (dark ground, cyan
-// accent, live status) and borrows the blog's reading ideas: one long page,
-// a section index that follows you, and notes in the margin.
+// rushi-jhala / training run.
+// The page is an experiment dashboard: the career is the run, each role and
+// project is a checkpoint, the CV's numbers are the evals, the stack is the
+// config. Desktop is one fixed stage; small screens fold into a column.
 
-const BLOG_URL = 'https://sololeveling-phi.vercel.app/';
+const THEMES = ['graphite', 'paper', 'phosphor'] as const;
+// Must match the stage breakpoint in index.css.
+const DESKTOP = '(min-width: 1180px) and (min-height: 700px)';
+type Theme = (typeof THEMES)[number];
 
-const LINKS = {
-  email: 'mailto:jhalarushi@gmail.com',
-  linkedin: 'https://linkedin.com/in/rushi-jhala-855076224',
-  github: 'https://github.com/Rushi0070',
-  x: 'https://x.com/JhalaRushi',
-  resume: '/resume.pdf',
+const store = {
+  get(k: string) {
+    try {
+      return window.localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set(k: string, v: string) {
+    try {
+      window.localStorage.setItem(k, v);
+    } catch {
+      /* private mode: preference just won't persist */
+    }
+  },
 };
 
-// --- Content ------------------------------------------------------------------
-
-interface Metric {
-  value: string;
-  label: string;
+// The theme attribute is set before React re-renders, so the canvas (whose
+// effect runs before this component's) repaints with the new tokens.
+function applyTheme(t: Theme) {
+  document.documentElement.dataset.theme = t;
+  store.set('theme', t);
 }
 
-interface Entry {
-  id: string;
-  title: string;
-  subtitle: string;
-  date?: string;
-  url?: string;
-  urlLabel?: string;
-  tags: string[];
-  metrics?: Metric[];
-  body: ReactNode;
-  note?: ReactNode;
-  figure?: { src: string; alt: string; caption: string };
-}
-
-const EXPERIENCE: Entry[] = [
-  {
-    id: 'aivid-tech-vision',
-    title: 'Aivid Tech Vision',
-    subtitle: 'Computer Vision Intern',
-    date: 'Feb 2025 – July 2025',
-    url: 'https://aivid.ai/about-us/',
-    urlLabel: 'aivid.ai',
-    tags: ['Edge AI', 'PyTorch', 'Docker', 'OpenCV', 'Real-time Systems'],
-    metrics: [
-      { value: '95%+', label: 'model accuracy' },
-      { value: '−70%', label: 'manual review time' },
-      { value: '<5s', label: 'alert latency' },
-      { value: '−40%', label: 'network bandwidth' },
-    ],
-    body: (
-      <ul>
-        <li>Engineered and deployed deep learning models for people-counting, demographic classification, and product defect detection; achieved 95%+ accuracy.</li>
-        <li>Automated SOP-compliance workflows by integrating IP camera feeds with AIVID BOTS, reducing client manual review time by 70%.</li>
-        <li>Architected real-time alerting systems (fire, intrusion, theft) with sub-5s end-to-end latency.</li>
-        <li>Optimized edge inference via model quantization and distributed pipelines, reducing network bandwidth consumption by 40%.</li>
-      </ul>
-    ),
-  },
-];
-
-const PROJECTS: Entry[] = [
-  {
-    id: 'sec-alpha-gen',
-    title: 'SEC Alpha Gen',
-    subtitle: 'Alphathon 2025',
-    url: 'https://github.com/Rushi0070/sec-investment-signals',
-    urlLabel: 'github',
-    tags: ['NLP', 'FinBERT', 'CatBoost', 'SHAP', 'Quantitative Finance'],
-    metrics: [
-      { value: '76.92%', label: 'accuracy' },
-      { value: '1.90', label: 'Sharpe ratio' },
-    ],
-    body: (
-      <p>
-        Quantitative NLP pipeline processing SEC 10-K/10-Q filings. Utilized FinBERT and RoBERTa to detect narrative shifts and generate tradable signals. Trained CatBoost with SHAP explainability achieving 76.92% accuracy and 1.90 Sharpe ratio.
-      </p>
-    ),
-  },
-  {
-    id: 'uber-demand-forecast',
-    title: 'Uber Demand Forecast',
-    subtitle: 'MLOps Pipeline',
-    tags: ['MLOps', 'XGBoost', 'DVC', 'Docker', 'CI/CD'],
-    body: (
-      <p>
-        Production-grade time-series forecasting pipeline for NYC cab demand using XGBoost. Engineered temporal and geospatial features with sliding-window cross-validation. Containerized with Docker, versioned with DVC, and CI/CD with GitHub Actions.
-      </p>
-    ),
-  },
-];
-
-const BUILDS: Entry[] = [
-  {
-    id: 'vitalsync',
-    title: 'VitalSync',
-    subtitle: 'Columbia University Hackathon // Qualcomm',
-    url: 'https://github.com/Rushi0070/VitalSync',
-    urlLabel: 'github',
-    tags: ['Edge AI', 'Snapdragon NPU', 'Qwen 6B VLM', 'YOLOv8', 'ONNX', 'React Native', 'On-Device ML'],
-    metrics: [
-      { value: 'NPU', label: 'Qwen 6B VLM via ONNX' },
-      { value: 'GPU', label: 'YOLOv8 activity tracking' },
-    ],
-    note: (
-      <>
-        <span className="note-key">sponsors</span>
-        Qualcomm, Columbia University
-        <span className="note-key">team</span>
-        Ishan Vaghani, Ying Lo, Charisse Lai
-      </>
-    ),
-    figure: {
-      src: '/images/vitalsync.png',
-      alt: 'The VitalSync team working at the Columbia University Hackathon',
-      caption: 'VitalSync, built at the Columbia University Hackathon, sponsored by Qualcomm',
-    },
-    body: (
-      <>
-        <p>
-          Just wrapped up an incredible week at the Columbia University Hackathon, sponsored by Qualcomm, where our team architected VitalSync: a multi-device ecosystem that redefines productivity through on-device edge intelligence. Designed to bridge the gap between deep-work "flow states" and physical well-being, VitalSync leverages the Snapdragon platform to run a dual-model pipeline: a Qwen 6B VLM on the NPU (via ONNX) for deep screen-context analysis and a YOLOv8 model on the integrated GPU for real-time physical activity tracking.
-        </p>
-        <p>
-          The core of VitalSync is accountability; when the system detects procrastination or a vital need for hydration and movement, it triggers a persistent "task-locked" popup that only closes once the vision models verify the task has been completed. This entire experience is managed via a React Native Android remote featuring seamless state persistence and haptic feedback, allowing users to initiate background PC sessions directly from their phones.
-        </p>
-        <p>
-          By optimizing model memory loading to preserve primary compute for daily tasks, we have created a performance "Vital Score" summary system that scales from personal wellness to enterprise-level employee productivity, proving that the future of private, responsive AI belongs on the edge.
-        </p>
-      </>
-    ),
-  },
-];
-
-const STACK: { title: string; items: string[] }[] = [
-  { title: 'Languages', items: ['Python', 'C++', 'Java', 'SQL', 'TypeScript'] },
-  { title: 'ML & AI', items: ['PyTorch', 'TensorFlow', 'HuggingFace', 'XGBoost', 'OpenCV'] },
-  { title: 'Infrastructure', items: ['Docker', 'AWS SageMaker', 'Git', 'DVC', 'Linux'] },
-  { title: 'Tools', items: ['Pandas', 'NumPy', 'Streamlit', 'Plotly', 'pytest'] },
-];
-
-interface Section {
-  id: string;
-  label: string;
-}
-
-const SECTIONS: Section[] = [
-  { id: 'experience', label: 'experience' },
-  { id: 'projects', label: 'projects' },
-  { id: 'builds', label: 'recent builds' },
-  { id: 'stack', label: 'stack' },
-  { id: 'about', label: 'about' },
-  { id: 'contact', label: 'contact' },
-];
-
-// --- Hooks --------------------------------------------------------------------
-
-// The last section whose top has crossed a line near the top of the viewport.
-function useActiveSection(ids: string[]) {
-  const [active, setActive] = useState(ids[0]);
-  const ticking = useRef(false);
+function usePrefersReducedMotion() {
+  const [reduce, setReduce] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   useEffect(() => {
-    const READ_LINE = 140;
-    const update = () => {
-      ticking.current = false;
-      let current = ids[0];
-      for (const id of ids) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-        if (el.getBoundingClientRect().top <= READ_LINE) current = id;
-        else break;
-      }
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
-        current = ids[ids.length - 1];
-      }
-      setActive(current);
-    };
-    const onScroll = () => {
-      if (ticking.current) return;
-      ticking.current = true;
-      requestAnimationFrame(update);
-    };
-    update();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, [ids]);
-  return [active, setActive] as const;
-}
-
-// Adds .is-visible to .reveal elements as they scroll into view.
-function useReveal() {
-  useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal'));
-    if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      els.forEach((el) => el.classList.add('is-visible'));
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            e.target.classList.add('is-visible');
-            io.unobserve(e.target);
-          }
-        }
-      },
-      { rootMargin: '0px 0px -8% 0px', threshold: 0.05 },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const on = () => setReduce(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
   }, []);
+  return reduce;
 }
 
-// --- Small pieces -------------------------------------------------------------
+function useNow(ms = 30_000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+  return now;
+}
 
-function External({ href, className, children }: { href: string; className?: string; children: ReactNode }) {
+interface GH {
+  repos: number;
+  pushedRepo: string;
+  pushedAt: string;
+}
+
+// Live, public GitHub activity: repo count and the most recent push
+// (cached for the session; dashes if offline or rate limited).
+function useGithub(user: string) {
+  const KEY = `gh2:${user}`;
+  const [gh, setGh] = useState<GH | null>(() => {
+    try {
+      const cached = sessionStorage.getItem(KEY);
+      return cached ? (JSON.parse(cached) as GH) : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (gh) return;
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const [u, r] = await Promise.all([
+          fetch(`https://api.github.com/users/${user}`, { signal: ctrl.signal }).then((x) => (x.ok ? x.json() : Promise.reject())),
+          fetch(`https://api.github.com/users/${user}/repos?sort=pushed&per_page=1`, { signal: ctrl.signal }).then((x) => (x.ok ? x.json() : Promise.reject())),
+        ]);
+        const latest = Array.isArray(r) && r[0] ? r[0] : null;
+        const value: GH = {
+          repos: u.public_repos ?? 0,
+          pushedRepo: latest?.name ?? '',
+          pushedAt: latest?.pushed_at ?? '',
+        };
+        setGh(value);
+        try {
+          sessionStorage.setItem(KEY, JSON.stringify(value));
+        } catch {
+          /* ignore */
+        }
+      } catch {
+        /* offline or rate limited: show dashes */
+      }
+    })();
+    return () => ctrl.abort();
+  }, [KEY, gh, user]);
+  return gh;
+}
+
+function idFromHash() {
+  const id = decodeURIComponent(window.location.hash.slice(1));
+  return CHECKPOINTS.some((c) => c.id === id) ? id : null;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const fmtTime = (d: Date) =>
+  d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).toLowerCase();
+const fmtDate = (d: Date) => `${d.getFullYear()}.${pad2(d.getMonth() + 1)}`;
+
+function monthsUntil(from: Date, to: Date) {
+  return Math.max(0, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()));
+}
+
+function ago(iso: string, now: Date) {
+  const ms = now.getTime() - new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return '';
+  const h = Math.round(ms / 3_600_000);
+  if (h < 1) return 'just now';
+  if (h < 48) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  return d < 60 ? `${d}d ago` : `${Math.round(d / 30)}mo ago`;
+}
+
+// --- small pieces -------------------------------------------------------------
+
+function Mark() {
+  // The mark is a loss curve: a stepped descent inside a square.
   return (
-    <a href={href} className={className} target="_blank" rel="noopener noreferrer">
+    <svg className="mark" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="15" height="15" fill="none" stroke="currentColor" />
+      <path d="M3 3.5V7.5H6.5V10H9.5V11.5H13" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function Panel({ title, meta, className, children, id }: { title: ReactNode; meta?: ReactNode; className?: string; children: ReactNode; id?: string }) {
+  return (
+    <section className={`panel ${className ?? ''}`} aria-label={typeof title === 'string' ? title : undefined} id={id}>
+      <header className="panel-head">
+        <span className="panel-title">{title}</span>
+        {meta && <span className="panel-meta">{meta}</span>}
+      </header>
+      <div className="panel-body">{children}</div>
+    </section>
+  );
+}
+
+function Ext({ href, children, className }: { href: string; children: ReactNode; className?: string }) {
+  const internal = href.startsWith('/') || href.startsWith('mailto');
+  return (
+    <a href={href} className={className} target={internal ? undefined : '_blank'} rel={internal ? undefined : 'noopener noreferrer'} download={href === LINKS.resume ? 'Rushi_Jhala_Resume.pdf' : undefined}>
       {children}
     </a>
   );
 }
 
-function LiveClock() {
-  const fmt = () =>
-    new Date()
-      .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
-      .toLowerCase();
-  const [time, setTime] = useState(fmt);
-  useEffect(() => {
-    const t = setInterval(() => setTime(fmt()), 30_000);
-    return () => clearInterval(t);
-  }, []);
-  return <time>{time}</time>;
-}
-
-function ReadingProgress() {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    const update = () => {
-      const total = document.documentElement.scrollHeight - window.innerHeight;
-      setProgress(total > 0 ? Math.min(1, Math.max(0, window.scrollY / total)) : 0);
-    };
-    update();
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    return () => {
-      window.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-    };
-  }, []);
-  return (
-    <div className="progress" aria-hidden="true">
-      <div className="progress-bar" style={{ transform: `scaleX(${progress})` }} />
-    </div>
-  );
-}
-
-function SectionHead({ index, id, title }: { index: number; id: string; title: string }) {
-  return (
-    <header className="section-head reveal">
-      <span className="section-num mono">{String(index).padStart(2, '0')} /</span>
-      <h2 id={`${id}-title`}>{title}</h2>
-    </header>
-  );
-}
-
-function EntryCard({ e }: { e: Entry }) {
-  const hasNote = Boolean(e.date || e.url || e.note);
-  return (
-    <article id={e.id} className="entry reveal">
-      <div className="entry-main">
-        <h3>{e.title}</h3>
-        <p className="entry-sub mono">{e.subtitle}</p>
-        {e.metrics && (
-          <div className="metrics">
-            {e.metrics.map((m) => (
-              <div key={m.label} className="metric">
-                <span className="metric-value mono">{m.value}</span>
-                <span className="metric-label">{m.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {e.figure && (
-          <figure>
-            <img src={e.figure.src} alt={e.figure.alt} loading="lazy" />
-            <figcaption>{e.figure.caption}</figcaption>
-          </figure>
-        )}
-        <div className="entry-body">{e.body}</div>
-        <ul className="chips" aria-label="Technologies">
-          {e.tags.map((t) => (
-            <li key={t} className="chip mono">{t}</li>
-          ))}
-        </ul>
-      </div>
-      {hasNote && (
-        <aside className="entry-note">
-          {e.date && <span className="note-date mono">{e.date}</span>}
-          {e.url && (
-            <External href={e.url} className="note-link mono">
-              {e.urlLabel ?? e.url} ↗
-            </External>
-          )}
-          {e.note && <span className="note-extra">{e.note}</span>}
-        </aside>
-      )}
-    </article>
-  );
-}
-
-// --- Page ---------------------------------------------------------------------
-
-const SECTION_IDS = SECTIONS.map((s) => s.id);
+// --- page ---------------------------------------------------------------------
 
 export default function App() {
-  const [active, setActive] = useActiveSection(SECTION_IDS);
-  useReveal();
+  const reduceMotion = usePrefersReducedMotion();
+  const now = useNow();
+  const gh = useGithub(LINKS.githubUser);
+  const term = useRef<TerminalHandle>(null);
+  const listRef = useRef<HTMLOListElement>(null);
 
-  const go = (ev: MouseEvent<HTMLAnchorElement>, id: string) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    ev.preventDefault();
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    history.replaceState(null, '', `#${id}`);
-    setActive(id);
-  };
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = store.get('theme') as Theme | null;
+    const t = saved && (THEMES as readonly string[]).includes(saved) ? saved : 'graphite';
+    applyTheme(t);
+    return t;
+  });
+  // The open checkpoint lives in the hash (#vitalsync), so each one has a link.
+  const [activeId, setActiveId] = useState(() => idFromHash() ?? CHECKPOINTS[0].id);
+  const [smoothing, setSmoothing] = useState(0.8);
+
+  const firstSelect = useRef(true);
+  useEffect(() => {
+    if (firstSelect.current) {
+      firstSelect.current = false;
+      return;
+    }
+    history.replaceState(null, '', `#${activeId}`);
+  }, [activeId]);
+  useEffect(() => {
+    const on = () => {
+      const id = idFromHash();
+      if (id) setActiveId(id);
+    };
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+
+  const cycleTheme = useCallback((name?: string) => {
+    let next: Theme;
+    if (name && (THEMES as readonly string[]).includes(name)) next = name as Theme;
+    else next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    applyTheme(next);
+    setTheme(next);
+    return next;
+  }, [theme]);
+
+  const active = CHECKPOINTS.find((c) => c.id === activeId) ?? CHECKPOINTS[0];
+  const activeIndex = CHECKPOINTS.indexOf(active);
+
+  const select = useCallback((id: string) => setActiveId(id), []);
+
+  // Keyboard: j/k or arrows walk the checkpoints, / or : opens the terminal,
+  // t cycles the theme. Ignored while typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        setActiveId(CHECKPOINTS[Math.min(CHECKPOINTS.length - 1, activeIndex + 1)].id);
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        setActiveId(CHECKPOINTS[Math.max(0, activeIndex - 1)].id);
+      } else if (e.key === '/' || e.key === ':') {
+        e.preventDefault();
+        term.current?.focus();
+      } else if (e.key === 't') {
+        cycleTheme();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeIndex, cycleTheme]);
+
+  // Keep the active row in view inside the list.
+  useEffect(() => {
+    const row = listRef.current?.querySelector<HTMLElement>('[aria-current="true"]');
+    row?.scrollIntoView({ block: 'nearest' });
+  }, [activeId]);
+
+  const step = daysBetween(EPOCH0, now);
+  const etaMonths = monthsUntil(now, RUN_END);
+  const allEvals = useMemo(() => CHECKPOINTS.flatMap((c) => (c.evals ?? []).map((e) => ({ ...e, id: c.id }))), []);
 
   return (
-    <div className="site">
-      <a href="#main" className="skip-link">Skip to content</a>
-      <ReadingProgress />
+    <div className="stage">
+      <a href="#ckpt" className="skip">skip to the checkpoint</a>
 
-      <header className="topbar">
-        <div className="topbar-inner">
-          <a href="#top" className="brand" onClick={(ev) => { ev.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-            <span className="brand-name">rushi jhala</span>
-            <span className="brand-sub mono">ms data science · stony brook</span>
+      {/* ---- top frame ---- */}
+      <header className="top">
+        <div className="who">
+          <a className="brand" href="/" aria-label={`${PERSON.name}, home`}>
+            <Mark />
+            <span>{PERSON.name.toLowerCase()}</span>
           </a>
-          <nav className="topnav mono" aria-label="Primary">
-            <a href="#experience" onClick={(ev) => go(ev, 'experience')}>work</a>
-            <a href="#builds" onClick={(ev) => go(ev, 'builds')}>builds</a>
-            <External href={BLOG_URL}>blog ↗</External>
-            <a href={LINKS.resume} download="Rushi_Jhala_Resume.pdf">resume ↓</a>
-          </nav>
+          <h1 className="tagline">
+            <span className="sr-only">{PERSON.name}: </span>
+            ms data science, stony brook <span className="dot">·</span> computer vision <span className="dot">·</span> nlp <span className="dot">·</span> edge ai
+          </h1>
         </div>
+        <nav className="links" aria-label="Elsewhere">
+          <Ext href={LINKS.github}>github</Ext>
+          <Ext href={LINKS.linkedin}>linkedin</Ext>
+          <Ext href={LINKS.blog}>blog</Ext>
+          <Ext href={LINKS.email}>email</Ext>
+          <Ext href={LINKS.resume} className="is-key">resume ↓</Ext>
+        </nav>
       </header>
 
-      <section className="hero" id="top">
-        <div className="status mono">
-          <span className="status-dot" aria-hidden="true" />
-          open to work
-          <span className="status-sep">·</span>
-          <span className="status-loc">long island, ny · <LiveClock /> et</span>
-        </div>
-        <h1 className="hero-title">
-          Bridging <span className="dim">Theory</span>
-          <br />
-          &amp; Production.
-        </h1>
-        <p className="hero-lede">
-          I am a Data Science Graduate Student specializing in Computer Vision and NLP. My work focuses on building robust, scalable intelligent systems for high-stakes environments like FinTech and Industrial IoT.
-        </p>
-        <dl className="facts mono">
-          <div><dt>now</dt><dd>MS Data Science, Stony Brook University</dd></div>
-          <div><dt>prev</dt><dd>Computer Vision Intern, Aivid Tech Vision</dd></div>
-          <div><dt>writing</dt><dd><External href={BLOG_URL}>sololeveling</External>, notes on machine learning</dd></div>
+      {/* ---- left: checkpoints ---- */}
+      <Panel title="checkpoints" meta={`${pad2(activeIndex + 1)}/${pad2(CHECKPOINTS.length)}`} className="p-ckpts">
+        <ol className="ckpts" ref={listRef}>
+          {CHECKPOINTS.map((c, i) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                className="ckpt"
+                aria-current={c.id === activeId ? 'true' : undefined}
+                onClick={() => {
+                  select(c.id);
+                  // In the single-column layout the buffer is further down: bring it up.
+                  if (!window.matchMedia(DESKTOP).matches) {
+                    document.getElementById('ckpt')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+                  }
+                }}
+              >
+                <span className="ckpt-n">{pad2(i + 1)}</span>
+                <span className="ckpt-id">{c.id}</span>
+                <span className={`ckpt-s s-${c.status}`}>{c.status === 'running' ? 'running' : 'done'}</span>
+                <span className="ckpt-k">
+                  {c.kind}
+                  {c.at && <span className="ckpt-at">{fmtDate(c.at)}</span>}
+                </span>
+                <span className="ckpt-r">{c.role.toLowerCase()}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </Panel>
+
+      {/* ---- centre top: the run ---- */}
+      <Panel
+        title={<><span className="dimmed">runs/{PERSON.handle}/</span>train/loss</>}
+        className="p-chart"
+        meta={
+          <span className="chart-tools">
+            <span className="legend">
+              <i className="sw sw-raw" /> raw <i className="sw sw-smooth" /> smoothed <i className="sw sw-fc" /> forecast
+            </span>
+            <label className="smoothing">
+              <span>smoothing</span>
+              <input
+                type="range"
+                min={0}
+                max={0.99}
+                step={0.01}
+                value={smoothing}
+                onChange={(e) => setSmoothing(Number(e.target.value))}
+                aria-label="Chart smoothing"
+              />
+              <output>{smoothing.toFixed(2)}</output>
+            </label>
+          </span>
+        }
+      >
+        <LossChart activeId={activeId} onSelect={select} smoothing={smoothing} theme={theme} now={now} reduceMotion={reduceMotion} />
+        <p className="chart-note">illustrative curve · x is real time · checkpoints sit where the cv dates them</p>
+      </Panel>
+
+      {/* ---- centre bottom left: the checkpoint buffer ---- */}
+      <Panel
+        title={`ckpts/${active.id}.md`}
+        className="p-ckpt"
+        id="ckpt"
+        meta={<span className={`badge b-${active.status}`}>{active.status}</span>}
+      >
+        <Buffer ckpt={active} />
+      </Panel>
+
+      {/* ---- centre bottom right: terminal ---- */}
+      <Panel title="terminal" className="p-term" meta="zsh">
+        <Terminal
+          ref={term}
+          themes={[...THEMES]}
+          step={step}
+          onSelect={select}
+          onTheme={cycleTheme}
+          onSmoothing={setSmoothing}
+          reduceMotion={reduceMotion}
+        />
+      </Panel>
+
+      {/* ---- right: config, eval; left bottom: system ---- */}
+      <Panel title="config.yaml" className="p-config">
+        <dl className="yaml">
+          <div>
+            <dt>name:</dt>
+            <dd>{PERSON.name.toLowerCase()}</dd>
+          </div>
+          <div>
+            <dt>focus:</dt>
+            <dd>
+              <span className="y-p">[</span>
+              {PERSON.focus.join(', ')}
+              <span className="y-p">]</span>
+            </dd>
+          </div>
+          {CONFIG.map((c) => (
+            <div key={c.key}>
+              <dt>{c.key}:</dt>
+              <dd>
+                <span className="y-p">[</span>
+                {c.value.map((v, i) => (
+                  <span key={v}>
+                    {v.toLowerCase()}
+                    {i < c.value.length - 1 && <span className="y-p">, </span>}
+                  </span>
+                ))}
+                <span className="y-p">]</span>
+              </dd>
+            </div>
+          ))}
         </dl>
-        <div className="hero-actions">
-          <a className="btn btn-primary" href={LINKS.resume} download="Rushi_Jhala_Resume.pdf">download resume</a>
-          <a className="btn" href={LINKS.email}>email me</a>
-          <External className="btn" href={LINKS.github}>github ↗</External>
-        </div>
-      </section>
+      </Panel>
 
-      <div className="layout">
-        <nav className="index mono" aria-label="Sections">
-          <div className="index-label">index</div>
-          <ol>
-            {SECTIONS.map((s, i) => (
-              <li key={s.id} className={active === s.id ? 'is-active' : ''}>
-                <a href={`#${s.id}`} onClick={(ev) => go(ev, s.id)}>
-                  <span className="index-num">{String(i + 1).padStart(2, '0')}</span>
-                  {s.label}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
-
-        <main id="main" className="content">
-          <section id="experience" aria-labelledby="experience-title">
-            <SectionHead index={1} id="experience" title="experience" />
-            {EXPERIENCE.map((e) => <EntryCard key={e.id} e={e} />)}
-          </section>
-
-          <section id="projects" aria-labelledby="projects-title">
-            <SectionHead index={2} id="projects" title="projects" />
-            {PROJECTS.map((e) => <EntryCard key={e.id} e={e} />)}
-          </section>
-
-          <section id="builds" aria-labelledby="builds-title">
-            <SectionHead index={3} id="builds" title="recent builds" />
-            {BUILDS.map((e) => <EntryCard key={e.id} e={e} />)}
-          </section>
-
-          <section id="stack" aria-labelledby="stack-title">
-            <SectionHead index={4} id="stack" title="stack" />
-            <div className="stack reveal">
-              {STACK.map((c) => (
-                <div key={c.title} className="stack-col">
-                  <h3 className="stack-title mono">{c.title}</h3>
-                  <ul>
-                    {c.items.map((item) => <li key={item}>{item}</li>)}
-                  </ul>
-                </div>
-              ))}
+      <Panel title="eval" className="p-eval" meta={`${allEvals.length} metrics`}>
+        <dl className="evals">
+          {allEvals.map((e) => (
+            <div key={`${e.id}-${e.key}`} className={e.id === activeId ? 'is-on' : ''}>
+              <dt>
+                <span className="ev-id">{e.id}/</span>
+                {e.key}
+              </dt>
+              <dd>
+                {e.gauge !== undefined && (
+                  <span className="gauge" style={{ '--g': e.gauge } as CSSProperties} aria-hidden="true" />
+                )}
+                <span className="num">{e.value}</span>
+              </dd>
             </div>
-          </section>
+          ))}
+        </dl>
+      </Panel>
 
-          <section id="about" aria-labelledby="about-title">
-            <SectionHead index={5} id="about" title="about" />
-            <div className="about reveal">
-              <div className="about-card">
-                <h3 className="about-label mono">education</h3>
-                <p><strong>Stony Brook University</strong><br />MS Data Science</p>
-                <p><strong>PDEU, India</strong><br />B.Tech ICT (8.47 GPA)</p>
-              </div>
-              <div className="about-card">
-                <h3 className="about-label mono">leadership impact</h3>
-                <p>
-                  As Core Committee Member (ML) at ACM Student Chapter PDEU, I organized a two-day DSA workshop covering C++, linear structures, and graph algorithms for 100+ students, and facilitated peer learning sessions for algorithmic problem-solving.
-                </p>
-              </div>
-            </div>
-          </section>
+      <Panel title="system" className="p-system">
+        <dl className="sys">
+          <div><dt>step</dt><dd>{step.toLocaleString('en-US')}</dd></div>
+          <div><dt>eta</dt><dd>{etaMonths} mo</dd></div>
+          <div><dt>local</dt><dd>{fmtTime(now)} et</dd></div>
+          <div><dt>repos</dt><dd>{gh ? gh.repos : '—'}</dd></div>
+          <div>
+            <dt>last push</dt>
+            <dd>{gh && gh.pushedAt ? ago(gh.pushedAt, now) : '—'}</dd>
+          </div>
+        </dl>
+        {gh?.pushedRepo && (
+          <p className="pushed">
+            <Ext href={`${LINKS.github}/${gh.pushedRepo}`}>{gh.pushedRepo} ↗</Ext>
+          </p>
+        )}
+      </Panel>
 
-          <section id="contact" aria-labelledby="contact-title">
-            <SectionHead index={6} id="contact" title="contact" />
-            <ul className="contact reveal">
-              <li><span className="contact-key mono">email</span><a href={LINKS.email}>jhalarushi@gmail.com</a></li>
-              <li><span className="contact-key mono">linkedin</span><External href={LINKS.linkedin}>rushi-jhala ↗</External></li>
-              <li><span className="contact-key mono">github</span><External href={LINKS.github}>Rushi0070 ↗</External></li>
-              <li><span className="contact-key mono">x</span><External href={LINKS.x}>@JhalaRushi ↗</External></li>
-              <li><span className="contact-key mono">resume</span><a href={LINKS.resume} download="Rushi_Jhala_Resume.pdf">Rushi_Jhala_Resume.pdf ↓</a></li>
-            </ul>
-          </section>
-        </main>
-      </div>
-
-      <footer className="footer mono">
-        <span>© {new Date().getFullYear()} rushi jhala</span>
-        <span>
-          <External href={BLOG_URL}>blog</External> · <External href={LINKS.linkedin}>linkedin</External> ·{' '}
-          <External href={LINKS.github}>github</External>
+      {/* ---- status line ---- */}
+      <footer className="status" aria-label="Status">
+        <span className="mode">TRAINING</span>
+        <span className="st-path">~/runs/{PERSON.handle}/ckpts/{active.id}.md</span>
+        <span className="st-item">{theme}</span>
+        <span className="st-item">smooth {smoothing.toFixed(2)}</span>
+        <span className="st-keys" aria-hidden="true">
+          <kbd>j</kbd><kbd>k</kbd> select <kbd>/</kbd> terminal <kbd>t</kbd> theme
         </span>
+        <span className="st-pos">{pad2(activeIndex + 1)}/{pad2(CHECKPOINTS.length)}</span>
       </footer>
     </div>
   );
