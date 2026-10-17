@@ -1,7 +1,10 @@
 // The shell behind the terminal. Commands navigate the site, search it, and
 // reach me; every name they print is clickable, so nobody has to type.
 
-import { CHECKPOINTS, CONFIG, EPOCH0, INTRO, LINKS, PERSON, RUN_END } from './data';
+import { CHECKPOINTS, CONFIG, EPOCH0, INTRO, LINKS, PERSON, PLAYLIST, RUN_END, spotifyOf } from './data';
+import type { Track } from './data';
+import { clock } from './player';
+import type { Player } from './player';
 import { HOME, PATHS, SECTIONS, entriesIn, fileOf, resolve, shownEntry } from './routes';
 import type { Route } from './routes';
 import { SKILLS, grep, skillGroupOf, which } from './search';
@@ -58,6 +61,7 @@ export interface Ctx {
   /** Columns the terminal can show, to decide on ASCII art. */
   cols: number;
   history: string[];
+  player: Player;
   print: (...l: Line[]) => void;
   clear: () => void;
   retrain: () => void;
@@ -73,6 +77,7 @@ const EXTERNAL: Record<string, string> = {
   twitter: LINKS.x,
 };
 
+const PLAYLIST_SIZE = PLAYLIST.length;
 const pad2 = (v: number) => String(v).padStart(2, '0');
 const ym = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
 const days = (a: Date, b: Date) => Math.round((b.getTime() - a.getTime()) / 86_400_000);
@@ -127,6 +132,11 @@ function didYouMean(word: string, pool: string[]) {
   return bestD <= Math.max(1, Math.floor(word.length / 3)) ? best : '';
 }
 
+const nowLines = (t: Track): Line[] => [
+  ok('▶ ', { t: t.title, cls: 'b' }, ` — ${t.artist}`),
+  dim('30s preview · full song on ', link('apple music', t.apple), ' · ', link('spotify', spotifyOf(t))),
+];
+
 const entryLabel = (id: string) => CHECKPOINTS.find((c) => c.id === id)?.title ?? id;
 
 // ---- commands -------------------------------------------------------------------
@@ -134,7 +144,7 @@ const entryLabel = (id: string) => CHECKPOINTS.find((c) => c.id === id)?.title ?
 interface Command {
   usage: string;
   help: string;
-  group: 'navigate' | 'find' | 'reach' | 'this';
+  group: 'navigate' | 'find' | 'reach' | 'offline' | 'this';
   run: (args: string[], ctx: Ctx) => void;
   hidden?: boolean;
 }
@@ -214,6 +224,7 @@ function fetchLines(ctx: Ctx): Line[] {
         ['stack', ['pytorch · opencv · onnx · xgboost · docker']],
         ['eta', ['may 2027 · ', n(monthsLeft(ctx.now)), ' months to go']],
         ['langs', ['python · java · sql']],
+        ['offline', ['dj · ', cmd(`${PLAYLIST_SIZE} tracks on rotation`, 'playlist')]],
         [
           'github',
           ctx.gh ? [n(ctx.gh.repos), ' repos', ...(ctx.gh.pushedAt ? [` · pushed ${ago(ctx.gh.pushedAt, ctx.now)}`] : [])] : ['—'],
@@ -253,6 +264,7 @@ const COMMANDS: Record<string, Command> = {
         ['navigate', [cmd('ls'), ' · ', cmd('cd <dir>', 'cd projects'), ' · ', cmd('open <name>', 'open vitalsync'), ' · ', cmd('tree'), ' · ', cmd('back')]],
         ['find', [cmd('grep <word>', 'grep onnx'), ' · ', cmd('which <skill>', 'which pytorch'), ' · ', cmd('log'), ' · ', cmd('eval')]],
         ['reach me', [cmd('mail [message]', 'mail hello'), ' · ', cmd('copy email'), ' · ', cmd('resume'), ' · ', cmd('ping')]],
+        ['offline', [cmd('cd offline'), ' · ', cmd('playlist'), ' · ', cmd('play [song]', 'play delilah'), ' · ', cmd('next'), ' · ', cmd('pause'), ' · ', cmd('np')]],
         ['this site', [cmd('fetch'), ' · ', cmd('theme [name]', 'theme'), ' · ', cmd('history'), ' · ', cmd('clear'), ' · ', cmd('man <cmd>', 'man grep')]],
       ];
       ctx.print(...table(groups.map(([g, ps]) => [key(g), ps])), dim('tab completes · ↑↓ history · everything underlined is clickable'));
@@ -454,6 +466,90 @@ const COMMANDS: Record<string, Command> = {
     },
   },
 
+  playlist: {
+    usage: 'playlist',
+    help: 'what is on rotation (click one to play its preview)',
+    group: 'offline',
+    run: (_, ctx) => {
+      const p = ctx.player;
+      ctx.print(
+        ...table(
+          p.tracks.map((t, i): [Part[], Part[]] => [
+            [{ t: i === p.index && p.playing ? '▶ ' : '  ', cls: 'art' }, cmd(`${pad2(i + 1)} ${t.title}`, `play ${i + 1}`)],
+            [{ t: t.artist, cls: 'k' }],
+          ]),
+        ),
+        dim('30-second official previews · ', cmd('play'), ' starts at the top'),
+      );
+    },
+  },
+  play: {
+    usage: 'play [song|number]',
+    help: 'play a preview: play, play delilah, play 3',
+    group: 'offline',
+    run: (args, ctx) => {
+      const p = ctx.player;
+      const arg = args.join(' ').toLowerCase();
+      let i: number | undefined;
+      if (arg) {
+        const num = Number(arg);
+        i = Number.isInteger(num) && num >= 1 && num <= p.tracks.length ? num - 1 : p.tracks.findIndex((t) => t.id.startsWith(arg) || t.title.toLowerCase().includes(arg));
+        if (i < 0) return ctx.print(err(`play: no song matching “${arg}”`), dim('try ', cmd('playlist')));
+      }
+      const target = i ?? Math.max(0, p.index);
+      p.play(target);
+      ctx.print(...nowLines(p.tracks[target]));
+    },
+  },
+  pause: {
+    usage: 'pause',
+    help: 'pause the music',
+    group: 'offline',
+    run: (_, ctx) => {
+      if (!ctx.player.playing) return ctx.print(dim('nothing is playing · try '), out(cmd('play')));
+      ctx.player.pause();
+      ctx.print(dim('❚❚ paused · ', cmd('play'), ' to resume'));
+    },
+  },
+  next: {
+    usage: 'next',
+    help: 'the next track',
+    group: 'offline',
+    run: (_, ctx) => {
+      const p = ctx.player;
+      const i = (p.index + 1) % p.tracks.length;
+      p.next();
+      ctx.print(...nowLines(p.tracks[i]));
+    },
+  },
+  prev: {
+    usage: 'prev',
+    help: 'the previous track (or the start of this one)',
+    group: 'offline',
+    run: (_, ctx) => {
+      const p = ctx.player;
+      const restart = p.time > 3 && p.index >= 0;
+      const i = restart ? p.index : (p.index - 1 + p.tracks.length) % p.tracks.length;
+      p.prev();
+      ctx.print(...nowLines(p.tracks[i]));
+    },
+  },
+  np: {
+    usage: 'np',
+    help: 'now playing',
+    group: 'offline',
+    run: (_, ctx) => {
+      const p = ctx.player;
+      if (!p.track) return ctx.print(dim('nothing yet · try '), out(cmd('play delilah')));
+      const cells = 24;
+      const on = Math.round((p.time / (p.duration || 30)) * cells);
+      ctx.print(
+        out({ t: p.playing ? '▶ ' : '❚❚ ', cls: 'art' }, { t: p.track.title, cls: 'b' }, ` — ${p.track.artist}`),
+        pre({ t: '━'.repeat(on), cls: 'art' }, { t: '━'.repeat(cells - on), cls: 'k' }, `  ${clock(p.time)} / ${clock(p.duration)}`),
+      );
+    },
+  },
+
   fetch: { usage: 'fetch', help: 'a summary of this run', group: 'this', run: (_, ctx) => ctx.print(...fetchLines(ctx)) },
   theme: {
     usage: 'theme [name]',
@@ -554,6 +650,13 @@ const ALIAS: Record<string, string> = {
   contact: 'cd contact',
   metrics: 'eval',
   cv: 'resume',
+  songs: 'playlist',
+  music: 'playlist',
+  queue: 'playlist',
+  skip: 'next',
+  stop: 'pause',
+  dj: 'cd offline',
+  offline: 'cd offline',
 };
 
 export const COMMAND_NAMES = Object.keys(COMMANDS).filter((c) => !COMMANDS[c].hidden);
@@ -599,6 +702,7 @@ const ARGS: Record<string, (ctx: Ctx) => string[]> = {
   which: () => SKILLS,
   grep: () => SKILLS,
   copy: () => ['email', 'link'],
+  play: (ctx) => ctx.player.tracks.map((t) => t.id),
 };
 
 /** Every candidate for what is being typed, best first. */
@@ -630,7 +734,13 @@ export function suggest(input: string, ctx: Ctx): string {
 
 // ---- suggestions by place -----------------------------------------------------------------
 
-export function chipsFor(route: Route): string[] {
+export function chipsFor(route: Route, playing = false): string[] {
+  if (route.section === 'offline') return playing ? ['pause', 'next', 'np', 'playlist'] : ['play delilah', 'playlist', 'play', 'cd projects'];
+  const base = chipsOn(route);
+  return playing ? [...base.slice(0, 4), 'pause'] : base;
+}
+
+function chipsOn(route: Route): string[] {
   const list = entriesIn(route.section);
   const e = shownEntry(route);
   if (e && list.length > 1) {

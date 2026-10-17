@@ -4,6 +4,7 @@ import { candidates, chipsFor, exec, suggest } from '../shell';
 import type { Ctx, Line, Part } from '../shell';
 import { cwdOf } from '../routes';
 import { hl } from '../hl';
+import { clock } from '../player';
 
 // The terminal is how the site is driven. Nav clicks land here as commands,
 // suggestions type themselves out, and everything printed is clickable.
@@ -294,7 +295,10 @@ const Terminal = forwardRef<TerminalHandle, Props>(function Terminal({ ctx, star
   };
 
   const syncPos = () => setPos(inputRef.current?.selectionStart ?? input.length);
-  const chips = chipsFor(ctx.route);
+  const chips = chipsFor(ctx.route, ctx.player.playing);
+  const np = ctx.player.track;
+  // Audio may only start inside a click, so player commands skip the typing.
+  const isPlayer = (c: string) => /^(play|pause|next|prev)\b/.test(c);
   const at = input[pos] ?? ' ';
 
   return (
@@ -303,6 +307,23 @@ const Terminal = forwardRef<TerminalHandle, Props>(function Terminal({ ctx, star
         <span className="term-title">terminal</span>
         <span className="term-dot">·</span>
         <span className="term-cwd">{cwdOf(ctx.route)}</span>
+        {np && (
+          <button
+            type="button"
+            className={`term-np ${ctx.player.playing ? 'is-on' : ''}`}
+            onClick={() => runNow(ctx.player.playing ? 'pause' : 'play', true)}
+            title={ctx.player.playing ? 'pause' : 'play'}
+          >
+            <span className="eq" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="np-t">{np.title}</span>
+            <span className="np-a">· {np.artist.split(/,|&/)[0].trim()}</span>
+            <span className="np-c">{clock(ctx.player.time)}</span>
+          </button>
+        )}
         <span className="term-hint">
           <kbd>/</kbd> to type · <kbd>tab</kbd> completes
         </span>
@@ -360,7 +381,13 @@ const Terminal = forwardRef<TerminalHandle, Props>(function Terminal({ ctx, star
       <div className="term-chips" aria-label="Suggestions">
         <span className="chips-label">try</span>
         {chips.map((c) => (
-          <button key={c} type="button" className="chip" disabled={busy} onClick={() => typeThenRun(c, undefined, true)}>
+          <button
+            key={c}
+            type="button"
+            className="chip"
+            disabled={busy}
+            onClick={() => (isPlayer(c) ? runNow(c, true) : typeThenRun(c, undefined, true))}
+          >
             {c}
           </button>
         ))}

@@ -18,6 +18,7 @@ export const SECTIONS: Section[] = [
   { id: 'education', file: 'education/', kind: 'education' },
   { id: 'leadership', file: 'leadership/', kind: 'leadership' },
   { id: 'skills', file: 'skills.yaml' },
+  { id: 'offline', file: 'offline.md' },
   { id: 'contact', file: 'contact.md' },
 ];
 

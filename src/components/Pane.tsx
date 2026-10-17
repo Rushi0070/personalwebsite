@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CONFIG, EPOCH0, INTRO, LINKS, LOOKING_FOR, PERSON, RUN_END } from '../data';
+import { CONFIG, EPOCH0, INTRO, LINKS, LOOKING_FOR, OFFLINE, PERSON, PLAYLIST, RUN_END, artAt, spotifyOf } from '../data';
 import type { Checkpoint } from '../data';
 import { SECTIONS, entriesIn, fileOf, shownEntry } from '../routes';
 import type { Route } from '../routes';
@@ -8,6 +8,8 @@ import { daysBetween } from '../run';
 import { grep } from '../search';
 import type { GH } from '../shell';
 import { mark } from '../hl';
+import { clock } from '../player';
+import type { Player } from '../player';
 import LossChart from './LossChart';
 
 // The view in the middle: one section or one entry at a time, never a long
@@ -24,6 +26,7 @@ interface Props {
   theme: string;
   reduceMotion: boolean;
   trainKey: number;
+  player: Player;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -42,6 +45,23 @@ const Ext = ({ href, children, className }: { href: string; children: ReactNode;
     {children}
   </a>
 );
+
+// A photo shown large over everything; a click or esc closes it.
+function Lightbox({ src, alt, caption, onClose }: { src: string; alt: string; caption: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="lightbox" role="dialog" aria-modal="true" aria-label={alt} onClick={onClose}>
+      <img src={src} alt={alt} />
+      <p>
+        {caption} · <span>click or esc to close</span>
+      </p>
+    </div>
+  );
+}
 
 // ---- header: where you are, prev/next, grep state ---------------------------------
 
@@ -151,12 +171,6 @@ function About({ run, now, gh, theme, reduceMotion, trainKey, hl }: Props) {
 
 function Detail({ c, hl, run }: { c: Checkpoint; hl: string; run: (cmd: string) => void }) {
   const [zoom, setZoom] = useState(false);
-  useEffect(() => {
-    if (!zoom) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setZoom(false);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [zoom]);
   return (
     <article className="detail" aria-labelledby={`${c.id}-t`}>
       <header className="d-head">
@@ -233,14 +247,7 @@ function Detail({ c, hl, run }: { c: Checkpoint; hl: string; run: (cmd: string) 
           )}
         </aside>
       </div>
-      {zoom && c.photo && (
-        <div className="lightbox" role="dialog" aria-modal="true" aria-label={c.photo.alt} onClick={() => setZoom(false)}>
-          <img src={c.photo.src} alt={c.photo.alt} />
-          <p>
-            {c.photo.caption} · <span>click or esc to close</span>
-          </p>
-        </div>
-      )}
+      {zoom && c.photo && <Lightbox src={c.photo.src} alt={c.photo.alt} caption={c.photo.caption} onClose={() => setZoom(false)} />}
     </article>
   );
 }
@@ -321,6 +328,140 @@ function Skills({ hl, run }: { hl: string; run: (cmd: string) => void }) {
   );
 }
 
+// Transport icons, drawn so they look the same in every font.
+function Icon({ name }: { name: 'prev' | 'play' | 'pause' | 'next' }) {
+  const d = {
+    prev: 'M3 3h1.6v10H3zM13 3v10L5.5 8z',
+    play: 'M4 2.5v11L13.5 8z',
+    pause: 'M3.5 3h3v10h-3zM9.5 3h3v10h-3z',
+    next: 'M11.4 3H13v10h-1.6zM3 3v10l7.5-5z',
+  }[name];
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path d={d} fill="currentColor" />
+    </svg>
+  );
+}
+
+function Eq() {
+  return (
+    <span className="eq" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
+function Offline({ player, run, hl }: { player: Player; run: (cmd: string) => void; hl: string }) {
+  const [zoom, setZoom] = useState(false);
+  const i = player.index < 0 ? 0 : player.index;
+  const cur = PLAYLIST[i];
+  const loaded = player.index >= 0;
+  const pct = loaded ? Math.min(100, (player.time / (player.duration || 30)) * 100) : 0;
+  const ph = OFFLINE.photo;
+  return (
+    <div className="v-offline">
+      <header className="off-head">
+        <h2 className="d-title">Offline</h2>
+        <p className="off-line">{mark(OFFLINE.line, hl)}</p>
+      </header>
+
+      <div className="off-grid">
+        <figure className="off-photo">
+          <button type="button" className="d-fig-btn" onClick={() => setZoom(true)} aria-label="View the photo larger">
+            <img
+              src={ph.small}
+              srcSet={`${ph.small} 1100w, ${ph.src} ${ph.width}w`}
+              sizes="(min-width: 1100px) 40vw, 92vw"
+              width={ph.width}
+              height={ph.height}
+              alt={ph.alt}
+            />
+            <span className="d-fig-zoom" aria-hidden="true">view large ↗</span>
+          </button>
+          <figcaption>{ph.caption}</figcaption>
+        </figure>
+
+        <section className={`np ${player.playing ? 'is-on' : ''}`} aria-label="Now playing">
+          <div className="np-cover">
+            <img
+              src={artAt(cur, 600)}
+              srcSet={`${artAt(cur, 600)} 600w, ${artAt(cur, 1200)} 1200w`}
+              sizes="(min-width: 1100px) 232px, 40vw"
+              width={1200}
+              height={1200}
+              alt={`${cur.title}, cover art`}
+            />
+          </div>
+          <p className="np-label">{loaded ? (player.playing ? 'now playing' : 'paused') : 'on rotation'}</p>
+          <p className="np-title">{cur.title}</p>
+          <p className="np-artist">{cur.artist}</p>
+          <div
+            className="np-bar"
+            role="slider"
+            aria-label="Position in the preview"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(pct)}
+            tabIndex={loaded ? 0 : -1}
+            onClick={(e) => {
+              if (!loaded) return;
+              const r = e.currentTarget.getBoundingClientRect();
+              player.seek((e.clientX - r.left) / r.width);
+            }}
+          >
+            <span style={{ width: `${pct}%` }} />
+          </div>
+          <p className="np-time">
+            <span>{clock(loaded ? player.time : 0)}</span>
+            <span>{clock(loaded ? player.duration : 30)}</span>
+          </p>
+          <div className="np-ctrl">
+            <button type="button" onClick={() => run('prev')} aria-label="Previous track">
+              <Icon name="prev" />
+            </button>
+            <button type="button" className="np-play" onClick={() => run(player.playing ? 'pause' : `play ${i + 1}`)} aria-label={player.playing ? 'Pause' : 'Play'}>
+              <Icon name={player.playing ? 'pause' : 'play'} />
+            </button>
+            <button type="button" onClick={() => run('next')} aria-label="Next track">
+              <Icon name="next" />
+            </button>
+          </div>
+          <p className="np-links">
+            full song: <Ext href={cur.apple}>apple music ↗</Ext> <Ext href={spotifyOf(cur)}>spotify ↗</Ext>
+          </p>
+          {player.error && <p className="np-err">{player.error}</p>}
+        </section>
+
+        <ol className="tracks" aria-label="Playlist">
+          {PLAYLIST.map((t, n) => {
+            const on = n === player.index;
+            return (
+              <li key={t.id}>
+                <button type="button" className={`trk ${on ? 'is-on' : ''}`} aria-current={on ? 'true' : undefined} onClick={() => run(on && player.playing ? 'pause' : `play ${n + 1}`)}>
+                  <span className="trk-n">{on && player.playing ? <Eq /> : pad2(n + 1)}</span>
+                  <img src={artAt(t, 120)} srcSet={`${artAt(t, 120)} 1x, ${artAt(t, 240)} 2x`} width={40} height={40} alt="" loading="lazy" />
+                  <span className="trk-text">
+                    <span className="trk-title">{mark(t.title, hl)}</span>
+                    <span className="trk-artist">{mark(t.artist, hl)}</span>
+                  </span>
+                  <span className="trk-len">{on ? clock(player.time) : '0:30'}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
+      <p className="off-note">
+        previews are apple music&apos;s official 30-second clips · tap a track, or type <code>play delilah</code>
+      </p>
+      {zoom && <Lightbox src={ph.src} alt={ph.alt} caption={ph.caption} onClose={() => setZoom(false)} />}
+    </div>
+  );
+}
+
 function Contact({ run }: { run: (cmd: string) => void }) {
   return (
     <div className="v-contact">
@@ -365,6 +506,7 @@ export default function Pane(props: Props) {
   else if (entriesIn(route.section).length > 1) view = <Index section={route.section} hl={hl} run={run} />;
   else if (route.section === 'skills') view = <Skills hl={hl} run={run} />;
   else if (route.section === 'contact') view = <Contact run={run} />;
+  else if (route.section === 'offline') view = <Offline player={props.player} run={run} hl={hl} />;
   else view = <About {...props} />;
   const label = SECTIONS.find((s) => s.id === route.section)?.id ?? 'about';
   return (

@@ -1057,6 +1057,354 @@ mark.hit {
   font: 12px/1.5 var(--mono-family);
 }
 
+/* offline: the dj photo, now playing, and the playlist */
+.v-offline {
+  max-width: 1240px;
+}
+.off-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 22px;
+  margin-bottom: 20px;
+}
+.off-head .d-title {
+  margin: 0;
+}
+.off-line {
+  color: var(--chrome);
+  font-size: 18px;
+}
+.off-grid {
+  display: grid;
+  gap: 28px;
+}
+@media (min-width: 1100px) {
+  .off-grid {
+    grid-template-columns: minmax(0, 1.3fr) clamp(170px, min(16vw, 30svh), 232px) minmax(0, 1fr);
+    gap: clamp(20px, 2.2vw, 32px);
+    align-items: start;
+  }
+}
+@media (min-width: 640px) and (max-width: 1099px) {
+  .off-grid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(200px, 1fr);
+    grid-template-areas:
+      "photo np"
+      "list  list";
+  }
+  .off-photo { grid-area: photo; }
+  .np { grid-area: np; }
+  .tracks { grid-area: list; }
+}
+.off-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  transition: border-color var(--fast) var(--ease);
+}
+.off-photo figcaption {
+  margin-top: 6px;
+  color: var(--dim);
+  font: 12px var(--mono-family);
+}
+
+.np {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.np-cover {
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--hover);
+}
+.np-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 900ms var(--ease);
+}
+.np.is-on .np-cover img {
+  transform: scale(1.025);
+}
+.np-label {
+  margin-top: 12px;
+  color: var(--dim);
+  font: 11.5px var(--mono-family);
+}
+.np.is-on .np-label {
+  color: var(--ok);
+}
+.np-title {
+  margin-top: 2px;
+  color: var(--ink);
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.np-artist {
+  color: var(--chrome);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.np-bar {
+  position: relative;
+  height: 3px;
+  margin-top: 14px;
+  background: var(--line);
+  cursor: pointer;
+}
+.np-bar::before {
+  content: "";
+  position: absolute;
+  inset: -7px 0;
+}
+.np-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--train);
+}
+.np-time {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  color: var(--dim);
+  font: 11.5px var(--mono-family);
+}
+.np-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.np-ctrl button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 30px;
+  border: 1px solid var(--line);
+  color: var(--chrome);
+  font: 12px/1 var(--mono-family);
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease), background-color var(--fast) var(--ease);
+}
+.np-ctrl button:hover {
+  border-color: var(--chrome);
+  color: var(--ink);
+}
+.np-ctrl .np-play {
+  width: 52px;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+}
+.np-ctrl .np-play:hover {
+  border-color: var(--train);
+  background: var(--train);
+  color: var(--bg);
+}
+.np-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 12px;
+  color: var(--dim);
+  font: 12px var(--mono-family);
+}
+.np-links a {
+  color: var(--train);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 3px;
+}
+.np-err {
+  margin-top: 8px;
+  color: var(--err);
+  font: 12px var(--mono-family);
+}
+
+.tracks li + li {
+  border-top: 1px solid var(--grid);
+}
+.trk {
+  display: grid;
+  grid-template-columns: 22px 40px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 4px 10px 4px 4px;
+  transition: background-color var(--fast) var(--ease);
+}
+.trk:hover {
+  background: var(--hover);
+}
+.trk.is-on {
+  background: var(--hover);
+  box-shadow: inset 2px 0 0 var(--train);
+}
+.trk-n {
+  color: var(--dim);
+  font: 12px var(--mono-family);
+  text-align: right;
+}
+.trk img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+.trk-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.trk-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trk.is-on .trk-title {
+  color: var(--train);
+}
+.trk-artist {
+  overflow: hidden;
+  color: var(--dim);
+  font: 11.5px/1.4 var(--mono-family);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trk-len {
+  color: var(--dim);
+  font: 12px var(--mono-family);
+}
+.off-note {
+  margin-top: 18px;
+  color: var(--dim);
+  font: 12px/1.5 var(--mono-family);
+}
+.off-note code {
+  padding: 1px 6px;
+  background: var(--hover);
+  color: var(--ink);
+}
+
+@media (max-width: 639px) {
+  /* small screens: a compact now-playing card, the playlist close below */
+  .np {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-areas:
+      "cover label"
+      "cover title"
+      "cover artist"
+      "cover ."
+      "bar   bar"
+      "time  time"
+      "ctrl  links";
+    column-gap: 14px;
+    align-items: start;
+  }
+  .np-cover { grid-area: cover; }
+  .np-label { grid-area: label; margin-top: 0; }
+  .np-title { grid-area: title; font-size: 16px; }
+  .np-artist { grid-area: artist; }
+  .np-bar { grid-area: bar; }
+  .np-time { grid-area: time; }
+  .np-ctrl { grid-area: ctrl; }
+  .np-links {
+    grid-area: links;
+    align-self: center;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+}
+
+/* equaliser bars: playing */
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 11px;
+}
+.eq i {
+  width: 2px;
+  height: 100%;
+  background: currentColor;
+  transform-origin: bottom;
+  animation: eq 900ms ease-in-out infinite;
+}
+.eq i:nth-child(2) {
+  animation-delay: -300ms;
+}
+.eq i:nth-child(3) {
+  animation-delay: -600ms;
+}
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.trk-n .eq {
+  color: var(--train);
+}
+
+/* the terminal bar's now playing */
+.term-np {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 48%;
+  margin-left: 14px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  color: var(--chrome);
+  line-height: 18px;
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.term-np:hover {
+  border-color: var(--chrome);
+}
+.term-np.is-on {
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  color: var(--ok);
+}
+.term-np .eq i {
+  transform: scaleY(0.4);
+  animation-play-state: paused;
+}
+.term-np.is-on .eq i {
+  animation-play-state: running;
+}
+.np-t {
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.np-a,
+.np-c {
+  flex: none;
+  color: var(--dim);
+}
+@media (max-width: 700px) {
+  .np-a {
+    display: none;
+  }
+}
+
 /* ---- the terminal ------------------------------------------------------------------ */
 .dock {
   position: relative;

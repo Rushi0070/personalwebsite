@@ -5,6 +5,7 @@ import { SECTIONS, entriesIn, fileOf, parseHash, routeOf, sameRoute, shownEntry,
 import type { Route } from './routes';
 import { daysBetween } from './run';
 import type { GH } from './shell';
+import { usePlayer } from './player';
 import Pane from './components/Pane';
 import Terminal from './components/Terminal';
 import type { TerminalHandle } from './components/Terminal';
@@ -121,6 +122,7 @@ export default function App() {
   const reduceMotion = usePrefersReducedMotion();
   const now = useNow();
   const gh = useGithub(LINKS.githubUser);
+  const player = usePlayer(reduceMotion);
   const term = useRef<TerminalHandle>(null);
 
   const [route, setRoute] = useState<Route>(initialRoute);
@@ -219,8 +221,9 @@ export default function App() {
       gh,
       now,
       retrain: () => setTrainKey((k) => k + 1),
+      player,
     }),
-    [route, go, back, cycleTheme, theme, gh, now],
+    [route, go, back, cycleTheme, theme, gh, now, player],
   );
 
   // Keys when not typing: / or : focuses the terminal, j/k move between
@@ -330,7 +333,7 @@ export default function App() {
       </nav>
 
       {/* ---- the view ---- */}
-      <Pane route={route} hl={hl} run={run} clearHl={() => setHl('')} now={now} gh={gh} theme={theme} reduceMotion={reduceMotion} trainKey={trainKey} />
+      <Pane route={route} hl={hl} run={run} clearHl={() => setHl('')} now={now} gh={gh} theme={theme} reduceMotion={reduceMotion} trainKey={trainKey} player={player} />
 
       {/* ---- the terminal ---- */}
       <div className="dock" id="term">

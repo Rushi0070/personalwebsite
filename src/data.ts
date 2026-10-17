@@ -196,3 +196,111 @@ export const CONFIG: { key: string; value: string[] }[] = [
   { key: 'databases', value: ['MySQL', 'PostgreSQL', 'MongoDB'] },
   { key: 'ai_tooling', value: ['Cursor', 'Claude', 'LLM agent workflows', 'prompt engineering', 'RAG', 'workflow automation'] },
 ];
+
+// ---- offline ------------------------------------------------------------------
+
+// The DJ side. Only what the photo and Rushi say; nothing about venues.
+export const OFFLINE = {
+  line: 'Outside of models and data, I DJ.',
+  photo: {
+    src: '/images/dj.jpg',
+    small: '/images/dj-1100.jpg',
+    width: 1776,
+    height: 1184,
+    alt: 'Rushi DJing at an outdoor event, under a white tent',
+    caption: 'behind the decks · sep 2026',
+  },
+};
+
+export interface Track {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  /** Apple Music's official 30-second preview (the label's chosen highlight). */
+  preview: string;
+  /** Cover at 100px; artAt() asks Apple's CDN for any size. */
+  art: string;
+  /** The full song on Apple Music. */
+  apple: string;
+}
+
+// On rotation: picked from Rushi's offline mix folder, matched to Apple's catalog.
+export const PLAYLIST: Track[] = [
+  {
+    id: 'delilah',
+    title: 'Delilah (pull me out of this)',
+    artist: 'Fred again.. & Delilah Montagu',
+    album: 'Actual Life 3 (January 1 - September 9 2022)',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/b7/52/49/b75249d5-f30c-15bd-b6b6-2b2592a8273f/mzaf_16220054371150220513.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/b0/9c/b7/b09cb72c-cca9-5d66-bc9d-a9b5e5f86b22/5054197236389.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/delilah-pull-me-out-of-this/1640463893?i=1640463908',
+  },
+  {
+    id: 'marea',
+    title: 'Marea (We’ve Lost Dancing)',
+    artist: 'Fred again.. & The Blessed Madonna',
+    album: 'Marea (We’ve Lost Dancing) - Single',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/15/ea/4e/15ea4ed2-f7fc-f87c-b44f-9ca2c628437a/mzaf_1763923556124349361.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/68/49/e4/6849e4dc-2692-20c7-b80f-6e823c245643/190296770036.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/marea-weve-lost-dancing/1553064273?i=1553064274',
+  },
+  {
+    id: 'kyle',
+    title: 'Kyle (I Found You)',
+    artist: 'Fred again..',
+    album: 'Actual Life (April 14 - December 17 2020)',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/c3/a3/16/c3a31653-c795-bebf-d11f-e98a64f1ea8a/mzaf_3958148253223135567.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/2c/b7/4f/2cb74fc9-7c37-a56e-2b57-7c284f224695/190295058562.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/kyle-i-found-you/1560355896?i=1560355898',
+  },
+  {
+    id: 'jungle',
+    title: 'Jungle',
+    artist: 'Fred again..',
+    album: 'USB',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/52/1a/40/521a4041-c628-be75-750b-c3b459a2f2b0/mzaf_7296001562809042319.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/cf/eb/fc/cfebfc00-935d-b7cb-ed55-6ed0bfdb1581/5026854879567.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/jungle/1884102759?i=1884104125',
+  },
+  {
+    id: 'baby-again',
+    title: 'Baby again..',
+    artist: 'Fred again.., Skrillex & Four Tet',
+    album: 'Baby again.. - Single',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/37/ad/61/37ad61d7-8656-bba8-4796-5177990f181b/mzaf_2502370054868255044.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/0f/b2/d5/0fb2d5e5-55f1-97e1-c6e7-1ab064e77cca/5054197600371.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/baby-again/1676442468?i=1676442470',
+  },
+  {
+    id: 'danielle',
+    title: 'Danielle (smile on my face)',
+    artist: 'Fred again..',
+    album: 'Actual Life 3 (January 1 - September 9 2022)',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/4e/4c/47/4e4c4742-d67b-37d5-e08a-1313a90a9576/mzaf_8719106652897709176.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/b0/9c/b7/b09cb72c-cca9-5d66-bc9d-a9b5e5f86b22/5054197236389.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/danielle-smile-on-my-face/1640463893?i=1640464458',
+  },
+  {
+    id: 'clara',
+    title: 'Clara (the night is dark)',
+    artist: 'Fred again..',
+    album: 'Actual Life 3 (January 1 - September 9 2022)',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/b5/3f/c9/b53fc9c4-3dd5-200b-a6b9-c7c79748d1e2/mzaf_161652498091892939.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/b0/9c/b7/b09cb72c-cca9-5d66-bc9d-a9b5e5f86b22/5054197236389.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/clara-the-night-is-dark/1640463893?i=1640464474',
+  },
+  {
+    id: 'lights-out',
+    title: 'Lights Out',
+    artist: 'Fred again.., Romy & HAAi',
+    album: 'Lights Out - Single',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/76/f6/0e/76f60e00-13aa-3f0c-8b9c-141f3252d55b/mzaf_6834729942846676511.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/c1/c2/fc/c1c2fcbd-fda6-1f16-9fa0-c3d84594f534/190296275449.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/lights-out/1605184456?i=1605184461',
+  },
+];
+
+export const artAt = (t: Track, px: number) => t.art.replace(/\/\d+x\d+bb\./, `/${px}x${px}bb.`);
+export const spotifyOf = (t: Track) =>
+  `https://open.spotify.com/search/${encodeURIComponent(`${t.title} ${t.artist.split(/,|&/)[0].trim()}`)}`;
