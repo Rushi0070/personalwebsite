@@ -272,6 +272,15 @@ export const PLAYLIST: Track[] = [
     art: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/90/52/6e/90526e94-89c7-8387-458f-1972f7995d48/1200214495824.jpg/100x100bb.jpg',
     apple: 'https://music.apple.com/us/album/benjy-chord/6796842304?i=6796842312',
   },
+  {
+    id: 'leavemealone',
+    title: 'leavemealone',
+    artist: 'Fred again.. & Baby Keem',
+    album: 'leavemealone - Single',
+    preview: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/fe/cb/47/fecb476a-cee9-cbc3-0894-62580f11ab1d/mzaf_12124886779666198890.plus.aac.p.m4a',
+    art: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/f7/da/f7/f7daf71b-52b2-c906-1d68-eec11a75b2f6/5054197912979.jpg/100x100bb.jpg',
+    apple: 'https://music.apple.com/us/album/leavemealone/1720043736?i=1720043991',
+  },
 ];
 
 export const artAt = (t: Track, px: number) => t.art.replace(/\/\d+x\d+bb\./, `/${px}x${px}bb.`);
