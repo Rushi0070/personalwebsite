@@ -1,338 +1,371 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
-import { CHECKPOINTS, CONFIG, LINKS, PERSON } from '../data';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
+import { candidates, chipsFor, exec, suggest } from '../shell';
+import type { Ctx, Line, Part } from '../shell';
+import { cwdOf } from '../routes';
 import { hl } from '../hl';
 
-export type Line =
-  | { k: 'cmd'; text: string }
-  | { k: 'out' | 'dim' | 'ok' | 'err' | 'num'; text: string }
-  | { k: 'kv'; key: string; value: string; w?: number } // w: key column, in cells
-  | { k: 'link'; text: string; href: string };
+// The terminal is how the site is driven. Nav clicks land here as commands,
+// suggestions type themselves out, and everything printed is clickable.
 
 export interface TerminalHandle {
+  /** Run a command; `type` animates it into the prompt first. */
+  run: (cmd: string, opts?: { type?: boolean }) => void;
   focus: () => void;
-  run: (cmd: string, echo?: boolean) => void;
 }
+
+type Base = Omit<Ctx, 'print' | 'clear' | 'history' | 'cols'>;
 
 interface Props {
-  themes: string[];
-  step: number;
-  /** The boot starts the first time this is true (the panel is on screen). */
+  ctx: Base;
+  /** Boot the first time this is true. */
   start: boolean;
-  onSelect: (id: string) => void;
-  onTheme: (name?: string) => string;
-  onSmoothing: (v: number) => void;
   reduceMotion: boolean;
+  onFocusChange: (focused: boolean) => void;
 }
 
-const OPENABLE: Record<string, string> = {
-  github: LINKS.github,
-  linkedin: LINKS.linkedin,
-  blog: LINKS.blog,
-  x: LINKS.x,
-  resume: LINKS.resume,
-};
+const MAX_LINES = 400;
+const CHAR_W = 7.8; // JetBrains Mono at 13px
 
-const COMMANDS = ['help', 'whoami', 'ls', 'cat', 'eval', 'config', 'open', 'email', 'theme', 'smooth', 'clear'];
+// ---- rendering ---------------------------------------------------------------
 
-const BOOT_CMD = 'python train.py --resume';
+function Prompt({ cwd }: { cwd: string }) {
+  return (
+    <span className="prompt" aria-hidden="true">
+      <span className="p-user">rushi@run</span> <span className="p-cwd">{cwd}</span> <span className="p-sym">$</span>{' '}
+    </span>
+  );
+}
 
-// The boot log, one line per chapter. Every value is from the CV; lines are
-// kept short enough not to wrap in the desktop panel.
-const boot = (step: number): Line[] => [
-  { k: 'dim', text: 'loading ckpts/ … 7 found' },
-  { k: 'kv', key: 'epoch 0', value: 'pdeu · b.tech ict · cgpa 8.47' },
-  { k: 'kv', key: 'ckpt', value: 'acm · dsa workshop · 100+' },
-  { k: 'kv', key: 'ckpt', value: 'aivid · acc 95%+ · alerts <5s' },
-  { k: 'kv', key: 'epoch 1', value: 'stony brook · ms data science' },
-  { k: 'kv', key: 'ckpt', value: 'vitalsync · yolo11n on npu' },
-  { k: 'kv', key: 'ckpt', value: 'sec-alpha-gen · finbert' },
-  { k: 'kv', key: 'ckpt', value: 'uber-demand · xgboost · dvc' },
-  { k: 'ok', text: `resumed at step ${step.toLocaleString('en-US')} · eta may 2027` },
-  { k: 'dim', text: 'type help, or cat a checkpoint' },
-];
-
-// Key/value rows whose key column fits the longest key, like `column -t`.
-const table = (rows: [string, string][]): Line[] => {
-  const w = Math.max(...rows.map(([k]) => k.length)) + 1;
-  return rows.map(([key, value]) => ({ k: 'kv', key, value, w }));
-};
-
-// Neighbouring keys on a QWERTY board, for the one believable typo.
-const NEAR: Record<string, string> = {
-  a: 'sq', e: 'wr', i: 'uo', n: 'bm', o: 'ip', r: 'et', s: 'ad', t: 'ry', u: 'yi', h: 'gj',
-};
-
-// The frames of a human typing `text`: each frame is what the line shows and
-// how long to wait before the next one. Spaces and punctuation take longer;
-// one letter slips to a neighbouring key, sits for a beat, and is backspaced.
-function keystrokes(text: string) {
-  const frames: { text: string; wait: number }[] = [];
-  const spots = [...text].map((ch, i) => (i > 6 && NEAR[ch] ? i : -1)).filter((i) => i >= 0);
-  const slip = spots[Math.floor(Math.random() * spots.length)]; // never in "python"
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    let wait = 34 + Math.random() * 46;
-    if (ch === ' ') wait += 30 + Math.random() * 70;
-    else if (/[-.]/.test(ch)) wait += 20 + Math.random() * 60;
-    if (Math.random() < 0.04) wait += 180 + Math.random() * 260;
-    if (i === slip) {
-      const wrong = NEAR[ch][Math.floor(Math.random() * NEAR[ch].length)];
-      frames.push({ text: text.slice(0, i) + wrong, wait: 260 + Math.random() * 120 });
-      frames.push({ text: text.slice(0, i), wait: 90 + Math.random() * 40 });
-    }
-    frames.push({ text: text.slice(0, i + 1), wait });
+function renderPart(p: Part, i: number, onRun: (c: string) => void): ReactNode {
+  if (typeof p === 'string') return <span key={i}>{hl(p)}</span>;
+  const cls = (p.cls ?? '').split(' ').filter(Boolean).map((c) => `c-${c}`).join(' ');
+  if (p.run) {
+    return (
+      <button key={i} type="button" className={`t-run ${cls}`} onClick={() => onRun(p.run!)} title={p.run}>
+        {p.t}
+      </button>
+    );
   }
-  return frames;
+  if (p.href) {
+    return (
+      <a key={i} className={`t-link ${cls}`} href={p.href} target={p.href.startsWith('mailto') ? undefined : '_blank'} rel="noopener noreferrer">
+        {p.t}
+      </a>
+    );
+  }
+  return (
+    <span key={i} className={cls}>
+      {p.t}
+    </span>
+  );
 }
 
-const Terminal = forwardRef<TerminalHandle, Props>(function Terminal(
-  { themes, step, start, onSelect, onTheme, onSmoothing, reduceMotion },
-  ref,
-) {
-  const [lines, setLines] = useState<Line[]>([]);
-  const [typed, setTyped] = useState('');
-  const [booted, setBooted] = useState(false);
-  const [input, setInput] = useState('');
-  const history = useRef<string[]>([]);
-  const hIndex = useRef(-1);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+function LineView({ l, onRun }: { l: Line; onRun: (c: string) => void }) {
+  if (l.k === 'cmd') {
+    return (
+      <p className="tl tl-cmd">
+        <Prompt cwd={l.cwd} />
+        <span>{l.text}</span>
+      </p>
+    );
+  }
+  if (l.k === 'kv') {
+    return (
+      <p className="tl tl-kv" style={{ gridTemplateColumns: `${l.w}ch minmax(0, 1fr)` }}>
+        <span className="kv-k">{l.key.map((p, i) => renderPart(p, i, onRun))}</span>
+        <span className="kv-v">{l.val.map((p, i) => renderPart(p, i, onRun))}</span>
+      </p>
+    );
+  }
+  if (l.k === 'fetch') {
+    // neofetch, with the site's mark for a logo
+    return (
+      <div className="tl tl-fetch">
+        <svg className="fetch-mark" viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="0.5" y="0.5" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="0.6" />
+          <path d="M3 3.5V7.5H6.5V10H9.5V11.5H13" fill="none" stroke="currentColor" strokeWidth="0.9" />
+        </svg>
+        <div className="fetch-body">
+          <p>{l.head.map((p, i) => renderPart(p, i, onRun))}</p>
+          <dl className="fetch-rows">
+            {l.rows.map(([k, v]) => (
+              <div key={k}>
+                <dt>{k}</dt>
+                <dd>{v.map((p, i) => renderPart(p, i, onRun))}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+    );
+  }
+  return <p className={`tl tl-${l.k}`}>{l.parts.map((p, i) => renderPart(p, i, onRun))}</p>;
+}
 
-  // Type the boot command like a person (uneven keys, one slip that gets
-  // backspaced), then stream the log.
-  useEffect(() => {
-    if (!start) return;
-    const BOOT = boot(step);
-    if (reduceMotion) {
-      setLines([{ k: 'cmd', text: BOOT_CMD }, ...BOOT]);
-      setBooted(true);
-      return;
-    }
-    const keys = keystrokes(BOOT_CMD);
-    let i = 0;
-    let timer = 0;
-    const typeNext = () => {
-      const { text, wait } = keys[i++];
-      setTyped(text);
-      if (i < keys.length) {
-        timer = window.setTimeout(typeNext, wait);
+// ---- typing --------------------------------------------------------------------
+
+// Frames of a person typing `text`: uneven keys, longer on spaces.
+function keystrokes(text: string) {
+  return [...text].map((_, i) => ({
+    text: text.slice(0, i + 1),
+    wait: 26 + Math.random() * 34 + (text[i] === ' ' ? 40 + Math.random() * 50 : 0),
+  }));
+}
+
+// ---- component -------------------------------------------------------------------
+
+const Terminal = forwardRef<TerminalHandle, Props>(function Terminal({ ctx, start, reduceMotion, onFocusChange }, ref) {
+  const [lines, setLines] = useState<Line[]>([]);
+  const [input, setInput] = useState('');
+  const [pos, setPos] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false); // small screens: is the log showing?
+  const history = useRef<string[]>([]); // most recent first
+  const [hist, setHist] = useState<string[]>([]); // the same, for rendering suggestions
+  const hIndex = useRef(-1);
+  const cols = useRef(100);
+  const logRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const timers = useRef<number[]>([]);
+
+  // Commands always see the latest route/theme/etc.
+  const ctxRef = useRef(ctx);
+  useLayoutEffect(() => {
+    ctxRef.current = ctx;
+  });
+
+  const print = useCallback((...ls: Line[]) => {
+    setLines((prev) => {
+      const next = [...prev, ...ls];
+      return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
+    });
+  }, []);
+  const clear = useCallback(() => setLines([]), []);
+
+  // For handlers (latest values) and for rendering (props and state only).
+  const liveCtx = (): Ctx => ({ ...ctxRef.current, print, clear, history: history.current, cols: cols.current });
+  const viewCtx: Ctx = { ...ctx, print, clear, history: hist, cols: 100 };
+
+  const runNow = useCallback(
+    (raw: string, reveal = false) => {
+      if (reveal) setOpen(true);
+      const text = raw.trim();
+      print({ k: 'cmd', text, cwd: cwdOf(ctxRef.current.route) });
+      if (!text) return;
+      if (history.current[0] !== text) history.current = [text, ...history.current].slice(0, 100);
+      setHist(history.current);
+      hIndex.current = -1;
+      exec(text, { ...ctxRef.current, print, clear, history: history.current, cols: cols.current });
+    },
+    [print, clear],
+  );
+
+  const typeThenRun = useCallback(
+    (text: string, then?: () => void, reveal = false) => {
+      if (reduceMotion) {
+        runNow(text, reveal);
+        then?.();
         return;
       }
-      timer = window.setTimeout(() => {
-        setTyped('');
-        setLines([{ k: 'cmd', text: BOOT_CMD }]);
-        let j = 0;
-        const stream = () => {
-          const line = BOOT[j++];
-          setLines((prev) => [...prev, line]);
-          if (j < BOOT.length) timer = window.setTimeout(stream, 90 + Math.random() * 140);
-          else setBooted(true);
-        };
-        timer = window.setTimeout(stream, 320);
-      }, 170);
-    };
-    timer = window.setTimeout(typeNext, 700);
-    return () => window.clearTimeout(timer);
-    // The boot runs once; a later step tick must not replay it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, reduceMotion]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [lines, typed]);
-
-  const print = (...ls: Line[]) => setLines((prev) => [...prev, ...ls]);
-
-  const exec = (raw: string, echo = true) => {
-    const cmd = raw.trim();
-    if (echo) print({ k: 'cmd', text: cmd });
-    if (!cmd) return;
-    history.current.unshift(cmd);
-    hIndex.current = -1;
-    const [name, ...args] = cmd.split(/\s+/);
-    const arg = args.join(' ').toLowerCase();
-
-    switch (name.toLowerCase()) {
-      case 'help':
-        print(
-          { k: 'kv', key: 'whoami', value: 'who is training' },
-          { k: 'kv', key: 'ls', value: 'list checkpoints' },
-          { k: 'kv', key: 'cat <id>', value: 'open a checkpoint' },
-          { k: 'kv', key: 'eval', value: 'eval metrics' },
-          { k: 'kv', key: 'config', value: 'run config (stack)' },
-          { k: 'kv', key: 'open <x>', value: Object.keys(OPENABLE).join(' · ') },
-          { k: 'kv', key: 'email', value: 'write to me' },
-          { k: 'kv', key: 'theme [x]', value: themes.join(' · ') },
-          { k: 'kv', key: 'smooth n', value: 'chart smoothing, 0 – 0.99' },
-          { k: 'kv', key: 'clear', value: 'clear the log' },
+      setBusy(true);
+      let t = 0;
+      for (const f of keystrokes(text)) {
+        t += f.wait;
+        timers.current.push(
+          window.setTimeout(() => {
+            setInput(f.text);
+            setPos(f.text.length);
+          }, t),
         );
-        break;
-      case 'whoami':
-        print({ k: 'out', text: `${PERSON.name.toLowerCase()} · ${PERSON.role.toLowerCase()}` }, { k: 'dim', text: PERSON.focus.join(' · ') + ' · ' + PERSON.location.toLowerCase() });
-        break;
-      case 'ls':
-        print(...table(CHECKPOINTS.map((c) => [c.id, `${c.kind} · ${c.status}`])));
-        break;
-      case 'cat': {
-        const c = CHECKPOINTS.find((x) => x.id === arg || x.id.startsWith(arg));
-        if (!c || !arg) {
-          print({ k: 'err', text: `cat: ${arg || 'missing checkpoint'}: try ls` });
-          break;
-        }
-        onSelect(c.id);
-        print({ k: 'ok', text: `→ #${c.id}` }, { k: 'dim', text: `${c.title.toLowerCase()} · ${c.role.toLowerCase()}` });
-        break;
       }
-      case 'eval': {
-        print(...table(CHECKPOINTS.flatMap((c) => (c.evals ?? []).map((e): [string, string] => [`${c.id}/${e.key}`, e.value]))));
-        break;
-      }
-      case 'config':
-        print(...table(CONFIG.map((c) => [c.key, c.value.join(', ').toLowerCase()])));
-        break;
-      case 'open': {
-        const href = OPENABLE[arg];
-        if (!href) {
-          print({ k: 'err', text: `open: ${arg || '?'}: one of ${Object.keys(OPENABLE).join(', ')}` });
-          break;
-        }
-        print({ k: 'link', text: `opening ${arg} ↗`, href });
-        window.open(href, '_blank', 'noopener,noreferrer');
-        break;
-      }
-      case 'email':
-        print({ k: 'link', text: PERSON.email, href: LINKS.email });
-        window.location.href = LINKS.email;
-        break;
-      case 'theme': {
-        const next = onTheme(arg || undefined);
-        print({ k: 'ok', text: `theme → ${next}` });
-        break;
-      }
-      case 'smooth':
-      case 'smoothing': {
-        const v = Number(arg);
-        if (!Number.isFinite(v) || v < 0 || v > 0.99) {
-          print({ k: 'err', text: `${name}: give a value between 0 and 0.99` });
-          break;
-        }
-        onSmoothing(v);
-        print({ k: 'ok', text: `smoothing → ${v.toFixed(2)}` });
-        break;
-      }
-      case 'clear':
-        setLines([]);
-        break;
-      case 'sudo':
-        print({ k: 'err', text: 'sudo: this run is read-only' });
-        break;
-      default:
-        print({ k: 'err', text: `zsh: command not found: ${name}` }, { k: 'dim', text: 'try help' });
-    }
-  };
+      timers.current.push(
+        window.setTimeout(() => {
+          setInput('');
+          setPos(0);
+          setBusy(false);
+          runNow(text, reveal);
+          then?.();
+        }, t + 160),
+      );
+    },
+    [reduceMotion, runNow],
+  );
 
   useImperativeHandle(ref, () => ({
+    run: (c, opts) => (opts?.type ? typeThenRun(c, undefined, true) : runNow(c)),
     focus: () => inputRef.current?.focus(),
-    run: (c: string, echo = true) => exec(c, echo),
   }));
 
+  // Boot once: a login line, then `fetch` types itself.
+  const booted = useRef(false);
+  useEffect(() => {
+    if (!start || booted.current) return;
+    booted.current = true;
+    const when = new Date().toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const id = window.setTimeout(() => {
+      print({ k: 'dim', parts: [`last login: ${when.toLowerCase()} · this terminal drives the site`] });
+      typeThenRun('fetch', () =>
+        print({ k: 'dim', parts: ['type ', { t: 'help', run: 'help', cls: 'r' }, ', or click a suggestion below. everything underlined is clickable.'] }),
+      );
+    }, reduceMotion ? 0 : 500);
+    timers.current.push(id);
+  }, [start, print, typeThenRun, reduceMotion]);
+
+  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
+
+  // Keep the newest line in view.
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lines]);
+
+  // How many columns fit (fetch drops its art when narrow).
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => {
+      cols.current = Math.floor(e.contentRect.width / CHAR_W);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const ghost = focused && !busy && pos === input.length ? suggest(input, viewCtx) : '';
+
+  const set = (v: string) => {
+    setInput(v);
+    setPos(v.length);
+  };
+
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      exec(input);
-      setInput('');
-    } else if (e.key === 'ArrowUp') {
+    if (busy) {
+      e.preventDefault();
+      return;
+    }
+    const k = e.key;
+    if (k === 'Enter') {
+      e.preventDefault();
+      runNow(input, true);
+      set('');
+    } else if (k === 'Tab') {
+      e.preventDefault();
+      const c = candidates(input, liveCtx());
+      if (c.length === 1) set(c[0] + (c[0].includes(' ') ? '' : ' '));
+      else if (c.length > 1) {
+        // extend to the common prefix, and show the options
+        let common = c[0];
+        for (const x of c) while (!x.startsWith(common)) common = common.slice(0, -1);
+        if (common.length > input.length) set(common);
+        print(
+          { k: 'cmd', text: input, cwd: cwdOf(ctxRef.current.route) },
+          { k: 'dim', parts: c.slice(0, 16).flatMap((x, i) => [...(i ? ['  '] : []), { t: x.split(' ').pop()!, run: x, cls: 'r' }]) },
+        );
+      } else if (ghost) set(input + ghost);
+    } else if (k === 'ArrowRight' && ghost && pos === input.length) {
+      e.preventDefault();
+      set(input + ghost);
+    } else if (k === 'ArrowUp') {
       e.preventDefault();
       const next = Math.min(history.current.length - 1, hIndex.current + 1);
       if (next >= 0) {
         hIndex.current = next;
-        setInput(history.current[next]);
+        set(history.current[next]);
       }
-    } else if (e.key === 'ArrowDown') {
+    } else if (k === 'ArrowDown') {
       e.preventDefault();
       const next = hIndex.current - 1;
       hIndex.current = Math.max(-1, next);
-      setInput(next >= 0 ? history.current[next] : '');
-    } else if (e.key === 'Tab') {
+      set(next >= 0 ? history.current[next] : '');
+    } else if (e.ctrlKey && (k === 'l' || k === 'L')) {
       e.preventDefault();
-      const [head, ...rest] = input.split(' ');
-      if (rest.length === 0) {
-        const m = COMMANDS.find((c) => c.startsWith(head));
-        if (m) setInput(m + ' ');
-      } else if (head === 'cat') {
-        const m = CHECKPOINTS.find((c) => c.id.startsWith(rest.join(' ')));
-        if (m) setInput(`cat ${m.id}`);
-      } else if (head === 'open') {
-        const m = Object.keys(OPENABLE).find((k) => k.startsWith(rest.join(' ')));
-        if (m) setInput(`open ${m}`);
-      }
-    } else if (e.key === 'Escape') {
+      clear();
+    } else if (e.ctrlKey && (k === 'c' || k === 'C') && !window.getSelection()?.toString()) {
+      e.preventDefault();
+      print({ k: 'cmd', text: `${input}^C`, cwd: cwdOf(ctxRef.current.route) });
+      set('');
+    } else if (e.ctrlKey && (k === 'u' || k === 'U')) {
+      e.preventDefault();
+      set('');
+    } else if (k === 'Escape') {
       inputRef.current?.blur();
     }
   };
 
+  const syncPos = () => setPos(inputRef.current?.selectionStart ?? input.length);
+  const chips = chipsFor(ctx.route);
+  const at = input[pos] ?? ' ';
+
   return (
-    <div className="term" onClick={() => inputRef.current?.focus()}>
-      <div className="term-scroll" ref={scrollRef} role="log" aria-live="polite">
+    <section className="term" data-open={open} aria-label="Terminal">
+      <header className="term-bar">
+        <span className="term-title">terminal</span>
+        <span className="term-dot">·</span>
+        <span className="term-cwd">{cwdOf(ctx.route)}</span>
+        <span className="term-hint">
+          <kbd>/</kbd> to type · <kbd>tab</kbd> completes
+        </span>
+        <button type="button" className="term-toggle" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          {open ? 'hide ▾' : 'log ▴'}
+        </button>
+      </header>
+
+      <div className="term-log" ref={logRef} role="log" aria-live="polite" onClick={(e) => e.target === e.currentTarget && inputRef.current?.focus()}>
         {lines.map((l, i) => (
-          <p
-            key={i}
-            className={`tl tl-${l.k}`}
-            style={l.k === 'kv' && l.w ? { gridTemplateColumns: `calc(var(--cw) * ${l.w}) minmax(0, 1fr)` } : undefined}
-          >
-            {l.k === 'cmd' && (
-              <>
-                <span className="prompt">rushi@run</span>
-                <span className="prompt-sep">:~$</span> {l.text}
-              </>
-            )}
-            {(l.k === 'out' || l.k === 'ok') && hl(l.text)}
-            {(l.k === 'dim' || l.k === 'err' || l.k === 'num') && l.text}
-            {l.k === 'kv' && (
-              <>
-                <span className="kv-k">{l.key}</span>
-                <span className="kv-v">{hl(l.value)}</span>
-              </>
-            )}
-            {l.k === 'link' && (
-              <a href={l.href} target={l.href.startsWith('mailto') ? undefined : '_blank'} rel="noopener noreferrer">
-                {l.text}
-              </a>
-            )}
-          </p>
+          <LineView key={i} l={l} onRun={(c) => runNow(c, true)} />
         ))}
-        {!booted && typed && (
-          <p className="tl tl-cmd">
-            <span className="prompt">rushi@run</span>
-            <span className="prompt-sep">:~$</span> {typed}
-            <span className="caret" aria-hidden="true" />
-          </p>
-        )}
-        {booted && (
-          <label className="tl tl-input">
-            <span className="prompt">rushi@run</span>
-            <span className="prompt-sep">:~$</span>
-            <span className="input-wrap">
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={onKey}
-                spellCheck={false}
-                autoComplete="off"
-                autoCapitalize="off"
-                aria-label="Terminal command"
-              />
-              <span className="ghost" aria-hidden="true">
-                {input}
-                <span className="caret" />
-              </span>
-            </span>
-          </label>
-        )}
       </div>
-    </div>
+
+      <label className={`term-input ${focused ? 'is-focus' : ''}`}>
+        <Prompt cwd={cwdOf(ctx.route)} />
+        <span className="input-wrap">
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setPos(e.target.selectionStart ?? e.target.value.length);
+              hIndex.current = -1;
+            }}
+            onKeyDown={onKey}
+            onKeyUp={syncPos}
+            onSelect={syncPos}
+            onFocus={() => {
+              setFocused(true);
+              onFocusChange(true);
+            }}
+            onBlur={() => {
+              setFocused(false);
+              onFocusChange(false);
+            }}
+            spellCheck={false}
+            autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            enterKeyHint="go"
+            aria-label="Type a command"
+            placeholder=""
+          />
+          <span className="ghost" aria-hidden="true">
+            {input.slice(0, pos)}
+            <span className="caret">{at}</span>
+            {input.slice(pos + 1)}
+            {ghost && <span className="sugg">{ghost}</span>}
+            {!input && !focused && !busy && <span className="placeholder">type a command, or click one below</span>}
+          </span>
+        </span>
+      </label>
+
+      <div className="term-chips" aria-label="Suggestions">
+        <span className="chips-label">try</span>
+        {chips.map((c) => (
+          <button key={c} type="button" className="chip" disabled={busy} onClick={() => typeThenRun(c, undefined, true)}>
+            {c}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 });
 

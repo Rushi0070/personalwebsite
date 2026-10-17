@@ -22,3 +22,23 @@ export function hl(text: string): ReactNode[] {
   if (last < text.length) out.push(text.slice(last));
   return out;
 }
+
+// hl(), plus every occurrence of `term` wrapped in <mark> (grep's hits).
+export function mark(text: string, term: string): ReactNode[] {
+  if (!term) return hl(text);
+  const q = term.toLowerCase();
+  const low = text.toLowerCase();
+  const out: ReactNode[] = [];
+  let last = 0;
+  for (let i = low.indexOf(q); i >= 0; i = low.indexOf(q, i + q.length)) {
+    if (i > last) out.push(<span key={`t${last}`}>{hl(text.slice(last, i))}</span>);
+    out.push(
+      <mark key={`m${i}`} className="hit">
+        {text.slice(i, i + q.length)}
+      </mark>,
+    );
+    last = i + q.length;
+  }
+  if (last < text.length) out.push(<span key={`t${last}`}>{hl(text.slice(last))}</span>);
+  return out;
+}

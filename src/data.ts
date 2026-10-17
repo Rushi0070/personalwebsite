@@ -37,6 +37,8 @@ export interface Checkpoint {
   kind: Kind;
   title: string;
   role: string;
+  /** One line for cards, summarising the CV bullets (no new facts). */
+  blurb: string;
   /** Shown exactly as written in the CV. */
   when?: string;
   /** Position on the timeline (only for checkpoints the CV dates). */
@@ -59,6 +61,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'experience',
     title: 'Aivid Tech Vision',
     role: 'Computer Vision Intern',
+    blurb: 'Real-time computer vision for people-counting, SOP compliance and alerting on AIVID BOTS.',
     when: 'Feb 2025 – July 2025',
     at: new Date(2025, 1, 1),
     status: 'finished',
@@ -83,6 +86,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'project',
     title: 'VitalSync',
     role: 'Qualcomm Hackathon',
+    blurb: 'A local-first focus and hydration tracker: YOLO11n on the Snapdragon NPU, qwen3-vl for screen activity.',
     status: 'finished',
     url: 'https://github.com/Rushi0070/VitalSync',
     urlLabel: 'github',
@@ -112,6 +116,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'project',
     title: 'SEC Alpha Gen',
     role: 'Alphathon 2025',
+    blurb: 'Tradable signals from SEC 10-K/10-Q filings, using FinBERT and RoBERTa to detect narrative shifts.',
     status: 'finished',
     url: 'https://github.com/Rushi0070/sec-investment-signals',
     urlLabel: 'github',
@@ -126,6 +131,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'project',
     title: 'Uber Demand Prediction',
     role: 'NYC Cab Forecasting',
+    blurb: 'Production-grade time-series forecasting of NYC cab demand across zones with XGBoost.',
     status: 'finished',
     stack: ['Python', 'scikit-learn', 'XGBoost', 'DVC', 'Docker'],
     config: [
@@ -145,6 +151,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'education',
     title: 'Stony Brook University',
     role: 'MS in Data Science',
+    blurb: 'Master of Science in Data Science, Long Island, NY.',
     when: 'Sept 2025 – May 2027 (Expected)',
     at: new Date(2025, 8, 1),
     status: 'running',
@@ -156,6 +163,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'education',
     title: 'Pandit Deendayal Energy University',
     role: 'B.Tech, Information and Communication Technology',
+    blurb: 'B.Tech in Information and Communication Technology, Gandhinagar, India.',
     when: 'Oct 2021 – June 2025',
     at: new Date(2021, 9, 1),
     status: 'finished',
@@ -171,6 +179,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'leadership',
     title: 'ACM Student Chapter, PDEU',
     role: 'Core Committee Member (Machine Learning)',
+    blurb: 'Ran a two-day DSA workshop for 100+ students and mentored peers on problem-solving.',
     when: 'Sept 2023 – May 2024',
     at: new Date(2023, 8, 1),
     status: 'finished',
