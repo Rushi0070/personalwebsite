@@ -224,7 +224,7 @@ function fetchLines(ctx: Ctx): Line[] {
         ['stack', ['pytorch · opencv · onnx · xgboost · docker']],
         ['eta', ['may 2027 · ', n(monthsLeft(ctx.now)), ' months to go']],
         ['langs', ['python · java · sql']],
-        ['music', ['dj, part-time at stony brook · ', cmd(`${PLAYLIST_SIZE} on rotation`, 'playlist')]],
+        ['music', ['on the decks at stony brook · ', cmd(`${PLAYLIST_SIZE} on rotation`, 'playlist')]],
         [
           'github',
           ctx.gh ? [n(ctx.gh.repos), ' repos', ...(ctx.gh.pushedAt ? [` · pushed ${ago(ctx.gh.pushedAt, ctx.now)}`] : [])] : ['—'],
@@ -267,7 +267,7 @@ const COMMANDS: Record<string, Command> = {
         ['after hours', [cmd('cd after-hours'), ' · ', cmd('playlist'), ' · ', cmd('play [song]', 'play delilah'), ' · ', cmd('next'), ' · ', cmd('pause'), ' · ', cmd('np')]],
         ['this site', [cmd('fetch'), ' · ', cmd('theme [name]', 'theme'), ' · ', cmd('history'), ' · ', cmd('clear'), ' · ', cmd('man <cmd>', 'man grep')]],
       ];
-      ctx.print(...table(groups.map(([g, ps]) => [key(g), ps])), dim('tab completes · ↑↓ history · everything underlined is clickable'));
+      ctx.print(...table(groups.map(([g, ps]) => [key(g), ps])), dim('tab completes · ↑↓ history · underlined means clickable'));
     },
   },
   man: {
@@ -450,7 +450,7 @@ const COMMANDS: Record<string, Command> = {
     run: (_, ctx) =>
       ctx.print(
         out(`PING ${PERSON.handle} via email and linkedin`),
-        out({ t: 'status: looking for full-time or internship roles from may 2027', cls: 'okc' }),
+        out({ t: 'status: open to full-time or internship roles · may 2027', cls: 'okc' }),
         out('64 bytes from ', { t: PERSON.email, cls: 'b' }, ': icmp_seq=1 ttl=64 · reachable'),
         dim('send a real one: ', cmd('mail hello'), ' · ', cmd('open linkedin')),
       ),

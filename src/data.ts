@@ -13,10 +13,10 @@ export const PERSON = {
 
 // One paragraph for the top of the page, made only of facts from the CV.
 export const INTRO =
-  'I’m a data science grad student at Stony Brook University. I build computer vision, NLP and edge AI systems: most recently real-time video analytics and alerting at Aivid Tech Vision, and a local-first focus tracker on a Snapdragon NPU for the Qualcomm Hackathon.';
+  'I build models that see, read, and run right where the data is. Lately: real-time video alerts at Aivid Tech Vision, and an on-device focus tracker on a Snapdragon NPU.';
 
 // What I'm looking for (stated by Rushi, 2026-10-17).
-export const LOOKING_FOR = 'Looking for full-time or internship roles from May 2027.';
+export const LOOKING_FOR = 'Next checkpoint: a full-time or internship role, from May 2027.';
 
 export const LINKS = {
   github: 'https://github.com/Rushi0070',
@@ -64,7 +64,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'experience',
     title: 'Aivid Tech Vision',
     role: 'Computer Vision Intern',
-    blurb: 'Real-time computer vision for people-counting, SOP compliance and alerting on AIVID BOTS.',
+    blurb: 'Cameras that count people, check SOPs and raise the alarm in under 5 seconds.',
     when: 'Feb 2025 – July 2025',
     at: new Date(2025, 1, 1),
     status: 'finished',
@@ -77,11 +77,11 @@ export const CHECKPOINTS: Checkpoint[] = [
       { key: 'alert latency', value: '<5s' },
     ],
     lines: [
-      'Engineered and deployed deep learning models for people-counting, demographic classification, and defect detection; achieved 95%+ accuracy on held-out test sets via hyperparameter tuning and precision/recall validation.',
-      'Automated SOP-compliance workflows by integrating IP camera feeds with AIVID BOTS, removing repetitive manual review and cutting client review time by 70% while increasing audit throughput.',
-      'Architected real-time alerting systems (fire, intrusion, theft) with sub-5s end-to-end latency, reducing critical incident response times for enterprise clients.',
-      'Replaced OpenCV video capture with high-performance GStreamer pipelines to maximize FPS and optimize edge inference throughput across AIVID BOTS.',
-      'Integrated CV pipelines with backend REST APIs to populate real-time dashboards and auto-generate inspection reports for stakeholders.',
+      'Shipped people-counting, demographic and defect-detection models at 95%+ held-out accuracy.',
+      'Wired IP cameras into AIVID BOTS to automate SOP checks, cutting client review time by 70%.',
+      'Built real-time alerts for fire, intrusion and theft: under 5 seconds, end to end.',
+      'Swapped OpenCV capture for GStreamer pipelines to push more frames through edge inference.',
+      'Piped results through REST APIs into live dashboards and inspection reports that write themselves.',
     ],
   },
   {
@@ -89,17 +89,17 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'project',
     title: 'VitalSync',
     role: 'Qualcomm Hackathon',
-    blurb: 'A local-first focus and hydration tracker: YOLO11n on the Snapdragon NPU, qwen3-vl for screen activity.',
+    blurb: 'Notices every sip and every slack-off. Not one frame leaves the device.',
     status: 'finished',
     url: 'https://github.com/Rushi0070/VitalSync',
     urlLabel: 'github',
     stack: ['Python', 'ONNX Runtime', 'QNN', 'YOLO11n', 'Ollama', 'qwen3-vl', 'OpenCV', 'TypeScript'],
     lines: [
-      'Prototyped a local-first focus and hydration tracker pairing YOLO11n with the qwen3-vl vision-language model; all webcam frames and screenshots stay on-device.',
-      'Configured ONNX Runtime with a QNNExecutionProvider → DirectML → CPU provider chain so detection targets the Snapdragon NPU where available and falls back gracefully.',
-      'Post-processed raw YOLO output into boxes behind a 0.4 confidence filter and NMS at 0.45 IoU, running inference on every 3rd frame rather than all of them.',
-      'Added a sip check intersecting bottle/cup/glass boxes with a mouth zone taken from the top 35% of the largest person box, edge-triggered so one sip registers once, not every frame.',
-      'Set up screen-activity classification (PRODUCTIVE / PROCRASTINATION) with qwen3-vl through Ollama, settling on 768px JPEG screenshots after smaller captures left on-screen window text unreadable to the model.',
+      'A focus and hydration tracker: YOLO11n watches the webcam, qwen3-vl reads the screen, nothing leaves the device.',
+      'ONNX Runtime tries the Snapdragon NPU first (QNN), then DirectML, then CPU.',
+      'Raw YOLO output becomes boxes at 0.4 confidence and 0.45 IoU NMS, on every 3rd frame.',
+      'A sip counts when a cup, bottle or glass meets the mouth zone (top 35% of the person box), once per sip, not per frame.',
+      'qwen3-vl, via Ollama, labels the screen PRODUCTIVE or PROCRASTINATION from 768px JPEGs; anything smaller blurred the window text.',
     ],
     photo: {
       src: '/images/vitalsync.png',
@@ -112,14 +112,14 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'project',
     title: 'SEC Alpha Gen',
     role: 'Alphathon 2025',
-    blurb: 'Tradable signals from SEC 10-K/10-Q filings, using FinBERT and RoBERTa to detect narrative shifts.',
+    blurb: 'Reads between the lines of 10-Ks and 10-Qs, and turns what changed into signals.',
     status: 'finished',
     url: 'https://github.com/Rushi0070/sec-investment-signals',
     urlLabel: 'github',
     stack: ['FinBERT', 'RoBERTa', 'CatBoost', 'SHAP'],
     lines: [
-      'Built a quantitative NLP pipeline processing SEC 10-K/10-Q filings, using FinBERT and RoBERTa to detect narrative shifts and generate tradable signals.',
-      'Trained a CatBoost model with SHAP explainability.',
+      'FinBERT and RoBERTa read SEC 10-K and 10-Q filings, catch narrative shifts, and turn them into tradable signals.',
+      'A CatBoost model makes the call; SHAP explains it.',
     ],
   },
   {
@@ -127,7 +127,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'project',
     title: 'Uber Demand Prediction',
     role: 'NYC Cab Forecasting',
-    blurb: 'Production-grade time-series forecasting of NYC cab demand across zones with XGBoost.',
+    blurb: 'Where New York will want a cab next, zone by zone.',
     status: 'finished',
     stack: ['Python', 'scikit-learn', 'XGBoost', 'DVC', 'Docker'],
     config: [
@@ -136,10 +136,10 @@ export const CHECKPOINTS: Checkpoint[] = [
       { key: 'ci', value: 'GitHub Actions + pytest' },
     ],
     lines: [
-      'Built a production-grade time-series forecasting pipeline to predict NYC cab demand across zones using XGBoost and scikit-learn.',
-      'Engineered temporal and geospatial features, utilizing sliding-window cross-validation to evaluate model performance via MAE/RMSE metrics.',
-      'Containerized the inference engine using Docker for consistent deployment and automated data versioning/reproducibility using DVC.',
-      'Established a CI/CD workflow with GitHub Actions running unit tests (pytest).',
+      'Time-series forecasting of NYC cab demand per zone, with XGBoost and scikit-learn.',
+      'Temporal and geospatial features, scored with sliding-window CV on MAE and RMSE.',
+      'Docker for the inference engine; DVC so every dataset version can be reproduced.',
+      'CI/CD on GitHub Actions, with pytest unit tests.',
     ],
   },
   {
@@ -147,7 +147,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'education',
     title: 'Stony Brook University',
     role: 'MS in Data Science',
-    blurb: 'Master of Science in Data Science, Long Island, NY.',
+    blurb: 'The current run, training on Long Island.',
     when: 'Sept 2025 – May 2027 (Expected)',
     at: new Date(2025, 8, 1),
     status: 'running',
@@ -159,15 +159,15 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'education',
     title: 'Pandit Deendayal Energy University',
     role: 'B.Tech, Information and Communication Technology',
-    blurb: 'B.Tech in Information and Communication Technology, Gandhinagar, India.',
+    blurb: 'Epoch 0. Where it started, in Gandhinagar, India.',
     when: 'Oct 2021 – June 2025',
     at: new Date(2021, 9, 1),
     status: 'finished',
     stack: [],
     evals: [{ key: 'cgpa', value: '8.47', gauge: 0.847 }],
     lines: [
-      'B.Tech in Information and Communication Technology (CGPA: 8.47), Gandhinagar, India.',
-      'Relevant coursework: Data Structures and Algorithms, Operating Systems, Machine Learning, AI Systems, Database Management Systems, Cloud Architecture, Probability and Statistics, Computer Organization.',
+      'B.Tech in Information and Communication Technology, Gandhinagar, India. CGPA 8.47.',
+      'Coursework: DSA, operating systems, machine learning, AI systems, databases, cloud architecture, probability and statistics, computer organization.',
     ],
   },
   {
@@ -175,14 +175,14 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'leadership',
     title: 'ACM Student Chapter, PDEU',
     role: 'Core Committee Member (Machine Learning)',
-    blurb: 'Ran a two-day DSA workshop for 100+ students and mentored peers on problem-solving.',
+    blurb: 'Two days, 100+ students, a lot of graphs.',
     when: 'Sept 2023 – May 2024',
     at: new Date(2023, 8, 1),
     status: 'finished',
     stack: [],
     lines: [
-      'Organized a two-day DSA workshop covering C++, linear structures, and graph algorithms for 100+ students.',
-      'Facilitated peer learning sessions and provided mentoring on algorithmic problem-solving.',
+      'Ran a two-day DSA workshop for 100+ students: C++, linear structures, graph algorithms.',
+      'Led peer study sessions and mentored on algorithmic problem-solving.',
     ],
   },
 ];
@@ -199,9 +199,9 @@ export const CONFIG: { key: string; value: string[] }[] = [
 
 // ---- after hours ------------------------------------------------------------------
 
-// The music side, in Rushi's words (2026-10-17): loves music, DJs part-time at Stony Brook.
+// The music side (Rushi, 2026-10-17): loves music, DJs part-time at Stony Brook.
 export const AFTER_HOURS = {
-  line: 'I love music, and I DJ part-time at Stony Brook.',
+  line: 'Loss goes down by day. Bass comes up by night. I DJ at Stony Brook.',
   photo: {
     src: '/images/dj.jpg',
     small: '/images/dj-1100.jpg',

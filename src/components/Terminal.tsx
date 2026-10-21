@@ -208,7 +208,7 @@ const Terminal = forwardRef<TerminalHandle, Props>(function Terminal({ ctx, star
     const id = window.setTimeout(() => {
       print({ k: 'dim', parts: [`last login: ${when.toLowerCase()} · this terminal drives the site`] });
       typeThenRun('fetch', () =>
-        print({ k: 'dim', parts: ['type ', { t: 'help', run: 'help', cls: 'r' }, ', or click a suggestion below. everything underlined is clickable.'] }),
+        print({ k: 'dim', parts: ['type ', { t: 'help', run: 'help', cls: 'r' }, ', or just click. anything underlined runs.'] }),
       );
     }, reduceMotion ? 0 : 500);
     timers.current.push(id);

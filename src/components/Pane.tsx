@@ -134,7 +134,7 @@ function About({ run, now, gh, theme, reduceMotion, trainKey, hl }: Props) {
         <p className="avail">
           <i aria-hidden="true" /> {LOOKING_FOR}{' '}
           <button type="button" onClick={() => run('open contact')}>
-            get in touch →
+            say hi →
           </button>
         </p>
         <p className="actions">
@@ -153,7 +153,7 @@ function About({ run, now, gh, theme, reduceMotion, trainKey, hl }: Props) {
           <span className="run-meta">illustrative</span>
         </figcaption>
         <LossChart key={trainKey} activeId="" onSelect={(id) => run(`open ${id}`)} smoothing={0.8} theme={theme} now={now} reduceMotion={reduceMotion} />
-        <p className="run-note">x is real time · each checkpoint is a chapter of the cv · click one</p>
+        <p className="run-note">every flag is a chapter · click one</p>
         <dl className="run-stats">
           <div>
             <dt>github</dt>
@@ -233,7 +233,7 @@ function Detail({ c, hl, run }: { c: Checkpoint; hl: string; run: (cmd: string) 
           )}
           {c.stack.length > 0 && (
             <div className="d-stack">
-              <p className="side-label">stack · click to see where else</p>
+              <p className="side-label">stack · click to trace</p>
               <ul className="tags">
                 {c.stack.map((s) => (
                   <li key={s}>
@@ -304,7 +304,7 @@ function Skills({ hl, run }: { hl: string; run: (cmd: string) => void }) {
   return (
     <div className="v-skills">
       <p className="index-note">
-        click any skill to see where it was used · or type <code>which pytorch</code>
+        click a skill to trace it · or type <code>which pytorch</code>
       </p>
       <dl className="skills">
         {CONFIG.map((g) => (
@@ -455,7 +455,7 @@ function AfterHours({ player, run, hl }: { player: Player; run: (cmd: string) =>
       </div>
 
       <p className="off-note">
-        previews are apple music&apos;s official 30-second clips · tap a track, or type <code>play delilah</code>
+        official 30s previews · tap a track, or type <code>play delilah</code>
       </p>
       {zoom && <Lightbox src={ph.src} alt={ph.alt} caption={ph.caption} onClose={() => setZoom(false)} />}
     </div>
@@ -468,7 +468,7 @@ function Contact({ run }: { run: (cmd: string) => void }) {
       <p className="contact-avail">
         <i aria-hidden="true" /> {LOOKING_FOR}
       </p>
-      <p className="contact-line">Email is the quickest way to reach me.</p>
+      <p className="contact-line">Shortest path to me: email.</p>
       <p className="contact-mail">
         <button type="button" onClick={() => run('mail')}>
           {PERSON.email}
@@ -485,7 +485,7 @@ function Contact({ run }: { run: (cmd: string) => void }) {
         <Ext href={LINKS.blog}>blog ↗</Ext>
       </p>
       <p className="contact-tip">
-        or from the terminal: <code>mail hi rushi</code> starts the email with that message.
+        terminal people: <code>mail hi rushi</code> pre-fills it.
       </p>
       <p className="colophon">
         {PERSON.location.toLowerCase()} · set in jetbrains mono and ibm plex sans · eta{' '}

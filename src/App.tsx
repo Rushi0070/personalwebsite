@@ -276,7 +276,7 @@ export default function App() {
         <p className="tagline">
           ms data science <span className="tag-sep">·</span>{' '}
           <button type="button" className="tag-avail" onClick={() => run('open contact')}>
-            <i aria-hidden="true" /> looking for full-time or internship roles from may 2027
+            <i aria-hidden="true" /> open to full-time &amp; internships · may 2027
           </button>
         </p>
         <nav className="links" aria-label="Elsewhere">
