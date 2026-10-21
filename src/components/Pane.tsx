@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AFTER_HOURS, CONFIG, EPOCH0, INTRO, LINKS, LOOKING_FOR, PERSON, PLAYLIST, RUN_END, artAt, spotifyOf } from '../data';
+import { AFTER_HOURS, BLOG_LINE, CONFIG, EPOCH0, INTRO, LINKS, LOOKING_FOR, PERSON, PLAYLIST, POSTS, RUN_END, artAt, spotifyOf } from '../data';
 import type { Checkpoint } from '../data';
 import { SECTIONS, entriesIn, fileOf, shownEntry } from '../routes';
 import type { Route } from '../routes';
@@ -328,6 +328,44 @@ function Skills({ hl, run }: { hl: string; run: (cmd: string) => void }) {
   );
 }
 
+// The posts live on the blog; each one here links out to it.
+function Blog({ hl }: { hl: string }) {
+  return (
+    <div className="v-blog">
+      <header className="off-head">
+        <h2 className="d-title">Blog</h2>
+        <p className="off-line">{BLOG_LINE}</p>
+      </header>
+      <ol className="posts">
+        {POSTS.map((p) => (
+          <li key={p.id}>
+            <Ext href={p.url} className="post">
+              <span className="post-meta">
+                <span>{p.date.toLowerCase()}</span>
+                <span>
+                  <b>{p.minutes}</b> min read
+                </span>
+                <span>{p.tags.map((t) => `#${t}`).join(' ')}</span>
+              </span>
+              <span className="post-title">{mark(p.title, hl)}</span>
+              <span className="post-blurb">{mark(p.blurb, hl)}</span>
+              <span className="card-tags" aria-label="Inside">
+                {p.inside.map((s) => (
+                  <span key={s}>{s}</span>
+                ))}
+              </span>
+              <span className="card-go">read it ↗</span>
+            </Ext>
+          </li>
+        ))}
+      </ol>
+      <p className="off-note">
+        opens on <Ext href={LINKS.blog}>sololeveling ↗</Ext> · or type <code>read gpu</code>
+      </p>
+    </div>
+  );
+}
+
 // Transport icons, drawn so they look the same in every font.
 function Icon({ name }: { name: 'prev' | 'play' | 'pause' | 'next' }) {
   const d = {
@@ -506,6 +544,7 @@ export default function Pane(props: Props) {
   else if (entriesIn(route.section).length > 1) view = <Index section={route.section} hl={hl} run={run} />;
   else if (route.section === 'skills') view = <Skills hl={hl} run={run} />;
   else if (route.section === 'contact') view = <Contact run={run} />;
+  else if (route.section === 'blog') view = <Blog hl={hl} />;
   else if (route.section === 'after-hours') view = <AfterHours player={props.player} run={run} hl={hl} />;
   else view = <About {...props} />;
   const label = SECTIONS.find((s) => s.id === route.section)?.id ?? 'about';

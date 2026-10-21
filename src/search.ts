@@ -1,6 +1,6 @@
 // grep and which over everything the site says.
 
-import { AFTER_HOURS, CHECKPOINTS, CONFIG, INTRO, PLAYLIST } from './data';
+import { AFTER_HOURS, CHECKPOINTS, CONFIG, INTRO, PLAYLIST, POSTS } from './data';
 import { HOME, routeOf } from './routes';
 import type { Route } from './routes';
 
@@ -35,6 +35,10 @@ function corpus(): { where: string; route: Route; text: string }[] {
     if (c.stack.length) out.push({ where: c.id, route, text: `stack: ${c.stack.join(', ')}` });
   }
   for (const g of CONFIG) out.push({ where: `skills/${g.key}`, route: { section: 'skills' }, text: g.value.join(', ') });
+  for (const p of POSTS) {
+    out.push({ where: 'blog', route: { section: 'blog' }, text: p.title });
+    out.push({ where: 'blog', route: { section: 'blog' }, text: p.blurb });
+  }
   out.push({ where: 'after-hours', route: { section: 'after-hours' }, text: AFTER_HOURS.line });
   for (const t of PLAYLIST) out.push({ where: 'after-hours', route: { section: 'after-hours' }, text: `${t.title} — ${t.artist}` });
   return out;

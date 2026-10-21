@@ -197,6 +197,36 @@ export const CONFIG: { key: string; value: string[] }[] = [
   { key: 'ai_tooling', value: ['Cursor', 'Claude', 'LLM agent workflows', 'prompt engineering', 'RAG', 'workflow automation'] },
 ];
 
+// ---- blog -------------------------------------------------------------------------
+
+// Rushi's posts on sololeveling, newest first. Title, summary, tags and
+// read time are as the blog shows them; `inside` is from the post's headings.
+export const BLOG_LINE = 'Notes on machine learning, math, and whatever else is rattling around.';
+
+export interface Post {
+  id: string;
+  title: string;
+  blurb: string;
+  date: string;
+  minutes: number;
+  tags: string[];
+  inside: string[];
+  url: string;
+}
+
+export const POSTS: Post[] = [
+  {
+    id: 'ai-hardware',
+    title: 'Things you need to know about AI from a hardware perspective',
+    blurb: 'Flops, cores, threads, memory bandwidth, warps and tensor cores, explained from the ground up by opening up an actual GPU.',
+    date: 'Aug 22, 2026',
+    minutes: 20,
+    tags: ['hardware', 'gpu', 'ml'],
+    inside: ['flops', 'cores vs threads', 'cpu vs gpu', 'memory bandwidth', 'simd', 'warps and grids', 'tensor cores'],
+    url: 'https://sololeveling-phi.vercel.app/blog/things-you-need-to-know-about-for-a-hardware-perspective-in-ai',
+  },
+];
+
 // ---- after hours ------------------------------------------------------------------
 
 // The music side (Rushi, 2026-10-17): loves music, DJs part-time at Stony Brook.

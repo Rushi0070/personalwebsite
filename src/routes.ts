@@ -18,6 +18,7 @@ export const SECTIONS: Section[] = [
   { id: 'education', file: 'education/', kind: 'education' },
   { id: 'leadership', file: 'leadership/', kind: 'leadership' },
   { id: 'skills', file: 'skills.yaml' },
+  { id: 'blog', file: 'blog.md' },
   { id: 'after-hours', file: 'after-hours.md' },
   { id: 'contact', file: 'contact.md' },
 ];
@@ -56,7 +57,7 @@ export const shownEntry = (r: Route): Checkpoint | null => {
 };
 
 // Names a section used to have, or that people might type for it.
-const RENAMED: Record<string, string> = { offline: 'after-hours', dj: 'after-hours' };
+const RENAMED: Record<string, string> = { offline: 'after-hours', dj: 'after-hours', writing: 'blog', posts: 'blog' };
 
 export function parseHash(hash: string): Route {
   const [raw, entry] = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);

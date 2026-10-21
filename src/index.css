@@ -1057,6 +1057,54 @@ mark.hit {
   font: 12px/1.5 var(--mono-family);
 }
 
+/* blog: posts link out to sololeveling */
+.v-blog {
+  max-width: 1120px;
+}
+.posts {
+  display: grid;
+  gap: 16px;
+}
+.post {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 22px 18px;
+  border: 1px solid var(--line);
+  transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease);
+}
+.post:hover {
+  border-color: var(--chrome);
+  background: var(--hover);
+}
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--dim);
+  font: 12.5px/1.4 var(--mono-family);
+}
+.post-meta b {
+  color: var(--num);
+  font-weight: 400;
+}
+.post-title {
+  color: var(--ink);
+  font-weight: 500;
+  font-size: clamp(21px, 2vw, 26px);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.post-blurb {
+  max-width: 68ch;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.55;
+}
+.v-blog .off-note a {
+  color: var(--train);
+}
+
 /* offline: the dj photo, now playing, and the playlist */
 .v-offline {
   max-width: 1240px;

@@ -1,8 +1,8 @@
 // The shell behind the terminal. Commands navigate the site, search it, and
 // reach me; every name they print is clickable, so nobody has to type.
 
-import { CHECKPOINTS, CONFIG, EPOCH0, INTRO, LINKS, PERSON, PLAYLIST, RUN_END, spotifyOf } from './data';
-import type { Track } from './data';
+import { CHECKPOINTS, CONFIG, EPOCH0, INTRO, LINKS, PERSON, PLAYLIST, POSTS, RUN_END, spotifyOf } from './data';
+import type { Post, Track } from './data';
 import { clock } from './player';
 import type { Player } from './player';
 import { HOME, PATHS, SECTIONS, entriesIn, fileOf, resolve, shownEntry } from './routes';
@@ -72,7 +72,7 @@ export interface Ctx {
 const EXTERNAL: Record<string, string> = {
   github: LINKS.github,
   linkedin: LINKS.linkedin,
-  blog: LINKS.blog,
+  sololeveling: LINKS.blog,
   x: LINKS.x,
   twitter: LINKS.x,
 };
@@ -138,6 +138,13 @@ const nowLines = (t: Track): Line[] => [
 ];
 
 const entryLabel = (id: string) => CHECKPOINTS.find((c) => c.id === id)?.title ?? id;
+
+const postLines = (p: Post): Line[] => [
+  out(link(p.title.toLowerCase(), p.url)),
+  dim(`${p.date.toLowerCase()} · ${p.minutes} min read · ${p.tags.map((t) => `#${t}`).join(' ')}`),
+];
+
+const findPost = (q: string) => POSTS.find((p) => p.id.startsWith(q) || p.tags.includes(q) || p.title.toLowerCase().includes(q));
 
 // ---- commands -------------------------------------------------------------------
 
@@ -208,6 +215,7 @@ function catLines(r: Route): Line[] {
       [key('resume'), cmd('resume')],
     ]);
   if (r.section === 'about') return [out(INTRO)];
+  if (r.section === 'blog') return POSTS.flatMap(postLines);
   return [err(`cat: ${r.section}: is a directory`), dim('try ', cmd(`ls ${r.section}`))];
 }
 
@@ -263,6 +271,7 @@ const COMMANDS: Record<string, Command> = {
       const groups: [string, Part[]][] = [
         ['navigate', [cmd('ls'), ' · ', cmd('cd <dir>', 'cd projects'), ' · ', cmd('open <name>', 'open vitalsync'), ' · ', cmd('tree'), ' · ', cmd('back')]],
         ['find', [cmd('grep <word>', 'grep onnx'), ' · ', cmd('which <skill>', 'which pytorch'), ' · ', cmd('log'), ' · ', cmd('eval')]],
+        ['blog', [cmd('cd blog'), ' · ', cmd('read <post>', 'read gpu')]],
         ['reach me', [cmd('mail [message]', 'mail hello'), ' · ', cmd('copy email'), ' · ', cmd('resume'), ' · ', cmd('ping')]],
         ['after hours', [cmd('cd after-hours'), ' · ', cmd('playlist'), ' · ', cmd('play [song]', 'play delilah'), ' · ', cmd('next'), ' · ', cmd('pause'), ' · ', cmd('np')]],
         ['this site', [cmd('fetch'), ' · ', cmd('theme [name]', 'theme'), ' · ', cmd('history'), ' · ', cmd('clear'), ' · ', cmd('man <cmd>', 'man grep')]],
@@ -355,6 +364,22 @@ const COMMANDS: Record<string, Command> = {
     },
   },
   pwd: { usage: 'pwd', help: 'where you are', group: 'navigate', run: (_, ctx) => ctx.print(out(fileOf(ctx.route))) },
+  read: {
+    usage: 'read [post]',
+    help: 'open a blog post in a new tab: read gpu',
+    group: 'navigate',
+    run: (args, ctx) => {
+      const q = args.join(' ').toLowerCase();
+      if (!q) {
+        ctx.print(...POSTS.flatMap(postLines));
+        return ctx.go({ section: 'blog' });
+      }
+      const p = findPost(q);
+      if (!p) return ctx.print(err(`read: no post matching “${q}”`), dim('try ', cmd('cd blog')));
+      openTab(p.url);
+      ctx.print(ok('opening ', link(p.title.toLowerCase(), p.url), ' in a new tab'));
+    },
+  },
 
   grep: {
     usage: 'grep <word>',
@@ -696,7 +721,8 @@ const ARGS: Record<string, (ctx: Ctx) => string[]> = {
   cd: () => ['..', '~', ...PATHS.filter((p) => SECTIONS.some((s) => s.id === p) || entriesIn(p.split('/')[0]).length > 0)],
   ls: () => [...SECTIONS.filter((s) => s.kind).map((s) => s.id), '-l'],
   open: () => [...CHECKPOINTS.map((c) => c.id), ...SECTIONS.map((s) => s.id), ...Object.keys(EXTERNAL).filter((k) => k !== 'twitter'), 'resume'],
-  cat: () => [...CHECKPOINTS.map((c) => c.id), 'skills', 'contact', 'about'],
+  cat: () => [...CHECKPOINTS.map((c) => c.id), 'skills', 'blog', 'contact', 'about'],
+  read: () => [...POSTS.map((p) => p.id), ...new Set(POSTS.flatMap((p) => p.tags))],
   theme: (ctx) => [...ctx.themes],
   man: () => COMMAND_NAMES,
   which: () => SKILLS,
@@ -762,6 +788,8 @@ function chipsOn(route: Route): string[] {
       return ['log', 'cd projects', 'mail hello'];
     case 'skills':
       return ['which pytorch', 'which docker', 'grep forecasting', 'cd projects'];
+    case 'blog':
+      return ['read gpu', 'cat blog', 'open sololeveling', 'cd projects'];
     case 'contact':
       return ['mail hello', 'copy email', 'resume', 'open linkedin', 'ping'];
     default:
