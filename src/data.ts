@@ -16,7 +16,7 @@ export const INTRO =
   'I build models that see, read, and run right where the data is. Lately: real-time video alerts at Aivid Tech Vision, and an on-device focus tracker on a Snapdragon NPU.';
 
 // What I'm looking for (stated by Rushi, 2026-10-17).
-export const LOOKING_FOR = 'Next checkpoint: a full-time or internship role, from May 2027.';
+export const LOOKING_FOR = 'Open to full-time and internship roles from May 2027.';
 
 export const LINKS = {
   github: 'https://github.com/Rushi0070',
@@ -147,7 +147,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'education',
     title: 'Stony Brook University',
     role: 'MS in Data Science',
-    blurb: 'The current run, training on Long Island.',
+    blurb: 'Where I am now, on Long Island.',
     when: 'Sept 2025 – May 2027 (Expected)',
     at: new Date(2025, 8, 1),
     status: 'running',
@@ -159,7 +159,7 @@ export const CHECKPOINTS: Checkpoint[] = [
     kind: 'education',
     title: 'Pandit Deendayal Energy University',
     role: 'B.Tech, Information and Communication Technology',
-    blurb: 'Epoch 0. Where it started, in Gandhinagar, India.',
+    blurb: 'Undergrad in Gandhinagar, India.',
     when: 'Oct 2021 – June 2025',
     at: new Date(2021, 9, 1),
     status: 'finished',
@@ -201,7 +201,7 @@ export const CONFIG: { key: string; value: string[] }[] = [
 
 // The music side (Rushi, 2026-10-17): loves music, DJs part-time at Stony Brook.
 export const AFTER_HOURS = {
-  line: 'Loss goes down by day. Bass comes up by night. I DJ at Stony Brook.',
+  line: 'I love music, and DJing for Stony Brook part-time.',
   photo: {
     src: '/images/dj.jpg',
     small: '/images/dj-1100.jpg',

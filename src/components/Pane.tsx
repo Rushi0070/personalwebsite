@@ -468,7 +468,7 @@ function Contact({ run }: { run: (cmd: string) => void }) {
       <p className="contact-avail">
         <i aria-hidden="true" /> {LOOKING_FOR}
       </p>
-      <p className="contact-line">Shortest path to me: email.</p>
+      <p className="contact-line">Email works best. Say hi.</p>
       <p className="contact-mail">
         <button type="button" onClick={() => run('mail')}>
           {PERSON.email}
